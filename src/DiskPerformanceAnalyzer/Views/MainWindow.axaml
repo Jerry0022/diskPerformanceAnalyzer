@@ -1,22 +1,246 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:DiskPerformanceAnalyzer.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:vm="using:DiskPerformanceAnalyzer.ViewModels"
+        xmlns:lvc="using:LiveChartsCore.SkiaSharpView.Avalonia"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="720"
         x:Class="DiskPerformanceAnalyzer.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="DiskPerformanceAnalyzer">
+        Title="Disk Performance Analyzer"
+        Width="1200" Height="720" MinWidth="1000" MinHeight="640"
+        Background="#151921">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <Window.Styles>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="#8B93A1" />
+        </Style>
+        <Style Selector="TextBlock.h1">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.cell">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="Margin" Value="8,0" />
+        </Style>
+        <Style Selector="TextBlock.num">
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, monospace" />
+        </Style>
+        <Style Selector="TextBlock.head">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#8B93A1" />
+            <Setter Property="Margin" Value="8,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.seg">
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#B7BEC9" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.seg.active">
+            <Setter Property="Background" Value="#3B8EEA" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.mini">
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Background" Value="#2A313D" />
+            <Setter Property="Foreground" Value="#D8DEE9" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="ListBox.disks ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+        <Style Selector="ListBox.disks ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.disks ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.disks ListBoxItem Border.card">
+            <Setter Property="Background" Value="#1D222C" />
+            <Setter Property="BorderBrush" Value="#2A313D" />
+        </Style>
+        <Style Selector="ListBox.disks ListBoxItem:pointerover Border.card">
+            <Setter Property="BorderBrush" Value="#3E4756" />
+        </Style>
+        <Style Selector="ListBox.disks ListBoxItem:selected Border.card">
+            <Setter Property="Background" Value="#22304A" />
+            <Setter Property="BorderBrush" Value="#3B8EEA" />
+        </Style>
+        <Style Selector="Border.row">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Height" Value="40" />
+        </Style>
+        <Style Selector="Border.row:pointerover">
+            <Setter Property="Background" Value="#1D222C" />
+        </Style>
+    </Window.Styles>
 
+    <Grid ColumnDefinitions="300,*">
+
+        <!-- Left rail: one card per physical disk -->
+        <Border Grid.Column="0" Background="#12151C" BorderBrush="#232933" BorderThickness="0,0,1,0" Padding="16">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+                    <TextBlock Classes="h1" Text="Disks" />
+                    <TextBlock Classes="muted" FontSize="12" Text="% active time, like Task Manager" />
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Bottom" Classes="muted" FontSize="11" Text="{Binding StatusText}" Margin="0,12,0,0" />
+                <ListBox ItemsSource="{Binding Disks}" SelectedItem="{Binding SelectedDisk}"
+                         Classes="disks" Background="Transparent" BorderThickness="0" Padding="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DiskViewModel">
+                            <Border Classes="card" CornerRadius="10" BorderThickness="1" Padding="14,12" Cursor="Hand">
+                                <Grid RowDefinitions="Auto,Auto,Auto,44">
+                                    <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
+                                    <TextBlock Grid.Row="1" Text="{Binding ActivePercentText}" FontSize="34" FontWeight="Light" Margin="0,2,0,0" />
+                                    <TextBlock Grid.Row="2" Classes="muted" FontSize="11" Text="{Binding ThroughputText}" />
+                                    <lvc:CartesianChart Grid.Row="3" Margin="-6,6,-6,-6"
+                                                        Series="{Binding SparkSeries}"
+                                                        XAxes="{Binding SparkXAxes}"
+                                                        YAxes="{Binding SparkYAxes}"
+                                                        TooltipPosition="Hidden"
+                                                        LegendPosition="Hidden"
+                                                        ZoomMode="None"
+                                                        IsHitTestVisible="False"
+                                                        Background="Transparent" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Right: chart on top, root-cause table below -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,2*,Auto,3*" Margin="20,16,20,16">
+
+            <!-- Header with title, frozen pill, pause -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border IsVisible="{Binding IsFrozen}" Background="#3A2F14" BorderBrush="#F2B94C" BorderThickness="1" CornerRadius="14" Padding="12,4">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="&#x23F8;" VerticalAlignment="Center" Foreground="#F2B94C" />
+                            <TextBlock Text="{Binding FrozenText}" VerticalAlignment="Center" Foreground="#F2B94C" FontWeight="SemiBold" />
+                            <Button Command="{Binding GoLiveCommand}" Content="Live" Classes="mini" Background="#F2B94C" Foreground="#1B1F27" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <Button Command="{Binding TogglePauseCommand}" Content="{Binding PauseButtonText}" Classes="mini" MinWidth="72" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Classes="h1" Text="{Binding SelectedDiskTitle}" />
+                    <TextBlock Classes="muted" FontSize="12" Text="Last 60 seconds. Click anywhere on the chart to freeze that second and see who was responsible." />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Big chart -->
+            <Border Grid.Row="1" Background="#1D222C" CornerRadius="10" Padding="8" MinHeight="200">
+                <Grid>
+                    <lvc:CartesianChart x:Name="Chart"
+                                        Series="{Binding Series}"
+                                        XAxes="{Binding XAxes}"
+                                        YAxes="{Binding YAxes}"
+                                        LegendPosition="Top"
+                                        TooltipPosition="Top"
+                                        ZoomMode="None"
+                                        Cursor="Cross"
+                                        Background="Transparent" />
+                    <TextBlock IsVisible="{Binding !HasSelection}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Text="Waiting for the first disk sample..." />
+                </Grid>
+            </Border>
+
+            <!-- Table toolbar -->
+            <DockPanel Grid.Row="2" Margin="0,14,0,6">
+                <Border DockPanel.Dock="Right" Background="#1D222C" CornerRadius="8" Padding="3" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Button Classes="seg" Classes.active="{Binding IsWindow1}" Content="1 s" Command="{Binding SelectWindowCommand}" CommandParameter="1" />
+                        <Button Classes="seg" Classes.active="{Binding IsWindow5}" Content="5 s" Command="{Binding SelectWindowCommand}" CommandParameter="5" />
+                        <Button Classes="seg" Classes.active="{Binding IsWindow60}" Content="60 s" Command="{Binding SelectWindowCommand}" CommandParameter="60" />
+                        <Button Classes="seg" Classes.active="{Binding IsCumulative}" Content="&#x3A3; since start" Command="{Binding SelectWindowCommand}" CommandParameter="all" />
+                    </StackPanel>
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Which programs cause this?" FontSize="15" FontWeight="SemiBold" />
+                    <TextBlock Classes="muted" FontSize="12">
+                        <Run Text="Processes with I/O on this disk, " /><Run Text="{Binding WindowLabel}" /><Run Text=". Right-click a row or use the buttons to open it in Explorer." />
+                    </TextBlock>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Process table -->
+            <Border Grid.Row="3" Background="#1D222C" CornerRadius="10" ClipToBounds="True">
+                <Grid RowDefinitions="34,*">
+                    <Border Grid.Row="0" Background="#181C25" BorderBrush="#2A313D" BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="2*,64,96,96,104,120,3*,150">
+                            <TextBlock Grid.Column="0" Classes="head" Text="PROCESS" />
+                            <TextBlock Grid.Column="1" Classes="head num" Text="PID" />
+                            <TextBlock Grid.Column="2" Classes="head num" Text="READ" />
+                            <TextBlock Grid.Column="3" Classes="head num" Text="WRITE" />
+                            <TextBlock Grid.Column="4" Classes="head num" Text="TOTAL" />
+                            <TextBlock Grid.Column="5" Classes="head" Text="SHARE" />
+                            <TextBlock Grid.Column="6" Classes="head" Text="TOP FILE" />
+                            <TextBlock Grid.Column="7" Classes="head" Text="ACTIONS" />
+                        </Grid>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Processes}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                    <Border Classes="row" BorderBrush="#232933" BorderThickness="0,0,0,1">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Open in Explorer (executable)" Command="{Binding OpenInExplorerCommand}" />
+                                                <MenuItem Header="Open file location (top file)" Command="{Binding OpenFileLocationCommand}" />
+                                                <Separator />
+                                                <MenuItem Header="Copy file path" Command="{Binding CopyPathCommand}" />
+                                                <MenuItem Header="Copy executable path" Command="{Binding CopyImagePathCommand}" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <Grid ColumnDefinitions="2*,64,96,96,104,120,3*,150">
+                                            <TextBlock Grid.Column="0" Classes="cell" Text="{Binding ProcessName}" FontWeight="SemiBold" ToolTip.Tip="{Binding ImagePathTooltip}" />
+                                            <TextBlock Grid.Column="1" Classes="cell num muted" Text="{Binding Pid}" />
+                                            <TextBlock Grid.Column="2" Classes="cell num" Text="{Binding ReadText}" Foreground="#4CC38A" />
+                                            <TextBlock Grid.Column="3" Classes="cell num" Text="{Binding WriteText}" Foreground="#F29E4C" />
+                                            <TextBlock Grid.Column="4" Classes="cell num" Text="{Binding TotalText}" FontWeight="SemiBold" />
+                                            <Grid Grid.Column="5" ColumnDefinitions="*,40" Margin="8,0" VerticalAlignment="Center">
+                                                <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding Share}" Height="6" MinWidth="0" Foreground="#3B8EEA" Background="#2A313D" />
+                                                <TextBlock Grid.Column="1" Classes="num muted" FontSize="11" Text="{Binding ShareText}" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <TextBlock Grid.Column="6" Classes="cell muted" Text="{Binding TopFileText}" ToolTip.Tip="{Binding TopFileTooltip}" />
+                                            <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0">
+                                                <Button Classes="mini" Content="Exe" Command="{Binding OpenInExplorerCommand}" ToolTip.Tip="Open the executable in Explorer" />
+                                                <Button Classes="mini" Content="File" Command="{Binding OpenFileLocationCommand}" ToolTip.Tip="Open the top file's folder in Explorer" />
+                                                <Button Classes="mini" Content="Copy" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the top file path" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="1" IsVisible="{Binding !HasProcesses}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                        <TextBlock Text="{Binding EmptyStateText}" FontSize="15" HorizontalAlignment="Center" Classes="muted" />
+                        <TextBlock Text="The disk is idle. Attributed I/O appears here as soon as a program reads or writes." FontSize="12" HorizontalAlignment="Center" Classes="muted" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
 </Window>

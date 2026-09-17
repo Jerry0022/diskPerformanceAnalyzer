@@ -8,6 +8,8 @@ public sealed class SnapshotRingBuffer
 {
     public const int DefaultCapacity = 60;
     public const int TopFilesPerProcess = 3;
+    /// <summary>Upper bound of distinct file paths tracked per process before pruning.</summary>
+    public const int MaxTrackedFilesPerProcess = 64;
 
     private readonly object _gate = new();
     private readonly DiskSnapshot[] _items;
@@ -162,6 +164,16 @@ public sealed class SnapshotRingBuffer
             var file = io.TopFiles[rank];
             var score = weight / (rank + 1);
             acc.Files[file] = acc.Files.GetValueOrDefault(file) + score;
+        }
+
+        // Cumulative totals live for the whole run; a busy process (System, browsers) touches
+        // thousands of distinct files. Keep only the hottest entries so memory stays flat.
+        if (acc.Files.Count > MaxTrackedFilesPerProcess)
+        {
+            foreach (var stale in acc.Files.OrderByDescending(f => f.Value).Skip(TopFilesPerProcess * 4).Select(f => f.Key).ToList())
+            {
+                acc.Files.Remove(stale);
+            }
         }
     }
 

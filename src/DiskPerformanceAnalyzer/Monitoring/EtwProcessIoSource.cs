@@ -18,17 +18,28 @@ public sealed class EtwProcessIoSource : IDisposable
     public const string SessionName = "DiskPerformanceAnalyzer-Kernel";
     public const int TopFilesPerProcess = SnapshotRingBuffer.TopFilesPerProcess;
 
+    // DiskIO gives the per-request events; DiskFileIO gives the FileKey -> file name rundown that
+    // TraceEvent uses to resolve DiskIOTraceData.FileName. The full FileIO/FileIOInit keywords
+    // would add every file operation system-wide (thousands of events per second) for no gain.
     private const KernelTraceEventParser.Keywords Keywords =
         KernelTraceEventParser.Keywords.DiskIO
-        | KernelTraceEventParser.Keywords.DiskFileIO
-        | KernelTraceEventParser.Keywords.FileIO
-        | KernelTraceEventParser.Keywords.FileIOInit;
+        | KernelTraceEventParser.Keywords.DiskFileIO;
+
+    /// <summary>
+    /// TraceEvent keeps every FileKey -> name mapping it has ever seen in a history dictionary that
+    /// is never trimmed, so a long-running session grows without bound. Recycling the session
+    /// drops that state; the cost is at most one second without process attribution.
+    /// </summary>
+    public static readonly TimeSpan SessionRecycleInterval = TimeSpan.FromMinutes(10);
+    private const int MaxFilesPerBucket = 32;
 
     private readonly object _gate = new();
     private readonly ConcurrentDictionary<int, string> _processNames = new();
     private Dictionary<(int Disk, int Pid), Bucket> _buckets = new();
     private Dictionary<int, List<(double Start, double End)>> _busy = new();
     private double _lastDrainMs = NowMs();
+    private DateTime _sessionStartedUtc;
+    private DateTime _lastPidSweepUtc = DateTime.UtcNow;
     private TraceEventSession? _session;
     private Thread? _pump;
     private bool _disposed;
@@ -44,20 +55,70 @@ public sealed class EtwProcessIoSource : IDisposable
                 return;
             }
 
-            StopStaleSession();
+            StartSessionLocked();
+        }
+    }
 
-            var session = new TraceEventSession(SessionName) { StopOnDispose = true };
-            session.EnableKernelProvider(Keywords);
-            session.Source.Kernel.DiskIORead += OnRead;
-            session.Source.Kernel.DiskIOWrite += OnWrite;
-            _session = session;
+    private void StartSessionLocked()
+    {
+        StopStaleSession();
 
-            _pump = new Thread(() => Pump(session))
+        var session = new TraceEventSession(SessionName) { StopOnDispose = true };
+        session.EnableKernelProvider(Keywords);
+        session.Source.Kernel.DiskIORead += OnRead;
+        session.Source.Kernel.DiskIOWrite += OnWrite;
+        _session = session;
+        _sessionStartedUtc = DateTime.UtcNow;
+
+        _pump = new Thread(() => Pump(session))
+        {
+            Name = "EtwProcessIoSource",
+            IsBackground = true,
+        };
+        _pump.Start();
+    }
+
+    private void StopSessionLocked()
+    {
+        var session = _session;
+        var pump = _pump;
+        _session = null;
+        _pump = null;
+        if (session is null)
+        {
+            return;
+        }
+
+        session.Source.Kernel.DiskIORead -= OnRead;
+        session.Source.Kernel.DiskIOWrite -= OnWrite;
+        session.Dispose();
+        pump?.Join(TimeSpan.FromSeconds(5));
+    }
+
+    /// <summary>Periodic housekeeping: recycle the ETW session and drop names of exited processes.</summary>
+    private void MaintainLocked()
+    {
+        var now = DateTime.UtcNow;
+        if (_session is not null && now - _sessionStartedUtc >= SessionRecycleInterval)
+        {
+            StopSessionLocked();
+            StartSessionLocked();
+        }
+
+        if (now - _lastPidSweepUtc >= TimeSpan.FromMinutes(2))
+        {
+            _lastPidSweepUtc = now;
+            var alive = new HashSet<int>();
+            foreach (var process in Process.GetProcesses())
             {
-                Name = "EtwProcessIoSource",
-                IsBackground = true,
-            };
-            _pump.Start();
+                alive.Add(process.Id);
+                process.Dispose();
+            }
+
+            foreach (var pid in _processNames.Keys.Where(pid => !alive.Contains(pid)).ToList())
+            {
+                _processNames.TryRemove(pid, out _);
+            }
         }
     }
 
@@ -72,6 +133,10 @@ public sealed class EtwProcessIoSource : IDisposable
         {
             drained = _buckets;
             _buckets = new Dictionary<(int, int), Bucket>(drained.Count);
+            if (!_disposed)
+            {
+                MaintainLocked();
+            }
         }
 
         var result = new Dictionary<int, List<ProcessIo>>();
@@ -168,7 +233,8 @@ public sealed class EtwProcessIoSource : IDisposable
                 bucket.Read += size;
             }
 
-            if (!string.IsNullOrEmpty(fileName))
+            if (!string.IsNullOrEmpty(fileName)
+                && (bucket.Files.Count < MaxFilesPerBucket || bucket.Files.ContainsKey(fileName)))
             {
                 bucket.Files[fileName] = bucket.Files.GetValueOrDefault(fileName) + size;
             }
@@ -231,8 +297,6 @@ public sealed class EtwProcessIoSource : IDisposable
 
     public void Dispose()
     {
-        TraceEventSession? session;
-        Thread? pump;
         lock (_gate)
         {
             if (_disposed)
@@ -241,21 +305,8 @@ public sealed class EtwProcessIoSource : IDisposable
             }
 
             _disposed = true;
-            session = _session;
-            pump = _pump;
-            _session = null;
-            _pump = null;
+            StopSessionLocked();
         }
-
-        if (session is null)
-        {
-            return;
-        }
-
-        session.Source.Kernel.DiskIORead -= OnRead;
-        session.Source.Kernel.DiskIOWrite -= OnWrite;
-        session.Dispose();
-        pump?.Join(TimeSpan.FromSeconds(5));
     }
 
     private sealed class Bucket

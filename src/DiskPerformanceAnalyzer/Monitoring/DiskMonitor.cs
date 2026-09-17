@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.Versioning;
 
 namespace DiskPerformanceAnalyzer.Monitoring;
@@ -50,7 +51,19 @@ public sealed class DiskMonitor : IDiskMonitor
         {
             while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false))
             {
-                var snapshot = Capture();
+                DiskSnapshot snapshot;
+                try
+                {
+                    snapshot = Capture();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A transient counter/ETW hiccup (disk hot-unplug, session recycle) must not
+                    // end the monitoring loop; skip this second and keep going.
+                    Trace.TraceWarning($"DiskMonitor tick failed: {ex.GetType().Name}: {ex.Message}");
+                    continue;
+                }
+
                 SnapshotReady?.Invoke(snapshot);
             }
         }

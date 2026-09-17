@@ -3,6 +3,8 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using DiskPerformanceAnalyzer.ViewModels;
 using DiskPerformanceAnalyzer.Views;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
 
 namespace DiskPerformanceAnalyzer;
 
@@ -13,14 +15,17 @@ public partial class App : Application
         AvaloniaXamlLoader.Load(this);
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public override void OnFrameworkInitializationCompleted()
     {
+        LiveCharts.Configure(config => config.AddDarkTheme());
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = new MainViewModel(),
-            };
+            var viewModel = new MainViewModel();
+            desktop.MainWindow = new MainWindow { DataContext = viewModel };
+            desktop.Exit += (_, _) => viewModel.Dispose();
+            viewModel.Start();
         }
 
         base.OnFrameworkInitializationCompleted();

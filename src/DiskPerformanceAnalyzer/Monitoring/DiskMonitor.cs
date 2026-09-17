@@ -61,8 +61,14 @@ public sealed class DiskMonitor : IDiskMonitor
 
     private DiskSnapshot Capture()
     {
-        var disks = _disks.Sample();
+        var counters = _disks.Sample();
         var drained = _processIo.DrainSecond();
+        // ETW-derived active time is authoritative: the PhysicalDisk "% Idle Time" counter
+        // reports 0 on many NVMe drives, which would pin the chart at 100 %.
+        var active = _processIo.DrainActivePercent();
+        var disks = counters
+            .Select(d => d with { ActivePercent = active.GetValueOrDefault(d.DiskNumber, 0.0) })
+            .ToList();
 
         var byDisk = new Dictionary<int, IReadOnlyList<ProcessIo>>(drained.Count);
         foreach (var (disk, list) in drained)

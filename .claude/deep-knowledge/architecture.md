@@ -11,7 +11,7 @@ out of scope.
 
 | Metric | Source | Notes |
 |--------|--------|-------|
-| Disk % active time | `PerformanceCounter("PhysicalDisk", "% Disk Time", "<n> C:")` — or `% Idle Time` inverted, which is what Task Manager actually uses | Per physical disk instance; poll at 1 s |
+| Disk % active time | **ETW-derived**: union of all DiskIO in-flight intervals (`TimeStamp − ElapsedTimeMSec` … `TimeStamp`) per disk per second → `BusyTime.ActivePercent` | The PhysicalDisk `% Idle Time` counter reports 0 (and `% Disk Time` > 3000 %) on NVMe drives — verified 2026-09-17 on this machine — so the counter is NOT used for % active |
 | Read/write throughput per disk | `PhysicalDisk\Disk Read Bytes/sec`, `Disk Write Bytes/sec` | Secondary axis on the chart |
 | Queue length | `PhysicalDisk\Current Disk Queue Length` | Saturation indicator |
 | Per-process I/O attribution | ETW kernel session, `KernelTraceEventParser.Keywords.DiskIO \| FileIO \| DiskFileIO` via `Microsoft.Diagnostics.Tracing.TraceEvent` | `DiskIORead/Write` events carry `ProcessID`, `DiskNumber`, `TransferSize`, `FileName` — this is the root-cause link disk → process → file |

@@ -27,6 +27,8 @@ public sealed class EtwProcessIoSource : IDisposable
     private readonly object _gate = new();
     private readonly ConcurrentDictionary<int, string> _processNames = new();
     private Dictionary<(int Disk, int Pid), Bucket> _buckets = new();
+    private Dictionary<int, List<(double Start, double End)>> _busy = new();
+    private double _lastDrainMs = NowMs();
     private TraceEventSession? _session;
     private Thread? _pump;
     private bool _disposed;
@@ -98,6 +100,35 @@ public sealed class EtwProcessIoSource : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Returns per-disk active time (0–100 %) for the window since the previous call, computed
+    /// as the union of all I/O in-flight intervals (see <see cref="BusyTime"/>). Disks without
+    /// any completed I/O in the window are absent.
+    /// </summary>
+    public Dictionary<int, double> DrainActivePercent()
+    {
+        Dictionary<int, List<(double Start, double End)>> drained;
+        double windowStart;
+        var windowEnd = NowMs();
+        lock (_gate)
+        {
+            drained = _busy;
+            _busy = new Dictionary<int, List<(double, double)>>(drained.Count);
+            windowStart = _lastDrainMs;
+            _lastDrainMs = windowEnd;
+        }
+
+        var result = new Dictionary<int, double>(drained.Count);
+        foreach (var (disk, intervals) in drained)
+        {
+            result[disk] = BusyTime.ActivePercent(intervals, windowStart, windowEnd);
+        }
+
+        return result;
+    }
+
+    private static double NowMs() => DateTime.UtcNow.Ticks / (double)TimeSpan.TicksPerMillisecond;
+
     private void OnRead(DiskIOTraceData data) => Record(data, isWrite: false);
 
     private void OnWrite(DiskIOTraceData data) => Record(data, isWrite: true);
@@ -108,9 +139,20 @@ public sealed class EtwProcessIoSource : IDisposable
         long size = data.TransferSize;
         // FileName is resolved by TraceEvent from FileKey via the FileIO/DiskFileIO rundown events.
         var fileName = data.FileName;
+        // Completion timestamp + elapsed time gives the interval this request was in flight.
+        var endMs = data.TimeStamp.ToUniversalTime().Ticks / (double)TimeSpan.TicksPerMillisecond;
+        var startMs = endMs - Math.Max(data.ElapsedTimeMSec, 0);
 
         lock (_gate)
         {
+            if (!_busy.TryGetValue(data.DiskNumber, out var intervals))
+            {
+                intervals = new List<(double, double)>();
+                _busy[data.DiskNumber] = intervals;
+            }
+
+            intervals.Add((startMs, endMs));
+
             if (!_buckets.TryGetValue(key, out var bucket))
             {
                 bucket = new Bucket();

@@ -6,7 +6,7 @@ Explorer". Not capacity/storage analysis — never count gigabytes.
 
 ## Stack
 .NET 8 · Avalonia 12 (MVVM, CommunityToolkit.Mvvm) · xunit · ETW via
-Microsoft.Diagnostics.Tracing.TraceEvent · PerformanceCounter for disk % active
+Microsoft.Diagnostics.Tracing.TraceEvent · PerformanceCounter for throughput/queue; % active derived from ETW
 
 ## Commands
 - Build: `dotnet build DiskPerformanceAnalyzer.sln`

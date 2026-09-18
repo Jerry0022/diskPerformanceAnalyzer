@@ -59,7 +59,7 @@ public class FilterSortTests
         Assert.Equal(ProcessSort.Name, vm.SortBy);
         Assert.False(vm.SortDescending); // text columns start ascending
         Assert.Equal(["chrome", "MsMpEng"], vm.Processes.Select(p => p.ProcessName).ToArray());
-        Assert.Equal(" \u25B2", vm.SortIndicatorName);
+        Assert.Equal(ProcessSort.Ops, vm.ShareMetric); // name sort keeps the request bar primary
 
         vm.SortCommand.Execute("Name");
         Assert.True(vm.SortDescending);
@@ -68,7 +68,10 @@ public class FilterSortTests
         vm.SortCommand.Execute("Write");
         Assert.True(vm.SortDescending); // numeric columns start descending
         Assert.Equal("MsMpEng", vm.Processes[0].ProcessName);
-        Assert.Equal(string.Empty, vm.SortIndicatorName);
+        Assert.Equal(ProcessSort.Bytes, vm.ShareMetric); // byte columns make the data bar primary
+        Assert.True(vm.Processes[0].IsBytesPrimary);
+        Assert.Equal(5_000 / 6_000.0, vm.Processes[0].ShareBytes, 3);
+        Assert.Equal(1 / 3.0, vm.Processes[0].ShareOps, 3);
     }
 
     [Fact]

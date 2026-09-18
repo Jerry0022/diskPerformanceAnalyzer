@@ -40,6 +40,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     private bool _started;
     private bool _disposed;
     private long _selfOpsSinceStart;
+    private int _dataAxisUnit = 2; // MB until the first sample says otherwise
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSelection), nameof(SelectedDiskTitle))]
@@ -80,13 +81,10 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     private int _selectedProcessCount;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SortIndicatorOps), nameof(SortIndicatorBytes), nameof(SortIndicatorName), nameof(SortIndicatorPid),
-        nameof(SortIndicatorRead), nameof(SortIndicatorWrite), nameof(SortIndicatorShare), nameof(SortIndicatorTopFile), nameof(ShareHeader))]
+    [NotifyPropertyChangedFor(nameof(ShareMetric))]
     private ProcessSort _sortBy = ProcessSort.Ops;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SortIndicatorOps), nameof(SortIndicatorBytes), nameof(SortIndicatorName), nameof(SortIndicatorPid),
-        nameof(SortIndicatorRead), nameof(SortIndicatorWrite), nameof(SortIndicatorShare), nameof(SortIndicatorTopFile))]
     private bool _sortDescending = true;
 
     // Column visibility (column manager). Numbers are behind the share bar by default; PID/read/write/requests are opt-in.
@@ -117,10 +115,10 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
 
         Series =
         [
-            Area("Read", ReadValues, ReadBytesColor, p => "Read " + Formatting.Rate(p.Model?.Value ?? 0)),
-            Area("Write", WriteValues, WriteBytesColor, p => "Write " + Formatting.Rate(p.Model?.Value ?? 0)),
-            Line("Read req/s", ReadOpsValues, ReadOpsColor, p => "Read " + Formatting.Iops(p.Model?.Value ?? 0)),
-            Line("Write req/s", WriteOpsValues, WriteOpsColor, p => "Write " + Formatting.Iops(p.Model?.Value ?? 0)),
+            Area(Labels.ReadData, ReadValues, ReadBytesColor, p => Labels.Read + " " + Formatting.Rate(p.Model?.Value ?? 0)),
+            Area(Labels.WriteData, WriteValues, WriteBytesColor, p => Labels.Write + " " + Formatting.Rate(p.Model?.Value ?? 0)),
+            Line(Labels.ReadRequests, ReadOpsValues, ReadOpsColor, p => Labels.Read + " " + Formatting.Iops(p.Model?.Value ?? 0)),
+            Line(Labels.WriteRequests, WriteOpsValues, WriteOpsColor, p => Labels.Write + " " + Formatting.Iops(p.Model?.Value ?? 0)),
             new LineSeries<DateTimePoint>
             {
                 Name = "Frozen",
@@ -142,7 +140,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         [
             new DateTimeAxis(TimeSpan.FromSeconds(10), d => d.ToString("HH:mm:ss"))
             {
-                TextSize = 11,
+                TextSize = 9,
                 LabelsPaint = new SolidColorPaint(SKColors.Gray),
                 SeparatorsPaint = new SolidColorPaint(SKColors.Gray.WithAlpha(0x30)),
             },
@@ -152,20 +150,24 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         [
             new Axis
             {
-                Name = "Throughput",
+                Name = Labels.DataAxis,
+                NameTextSize = 10,
+                NamePaint = new SolidColorPaint(SKColors.Gray),
                 MinLimit = 0,
-                Labeler = v => Formatting.Rate(v),
-                TextSize = 11,
+                Labeler = v => Formatting.RateIn(v, _dataAxisUnit),
+                TextSize = 9,
                 LabelsPaint = new SolidColorPaint(SKColors.Gray),
                 SeparatorsPaint = new SolidColorPaint(SKColors.Gray.WithAlpha(0x30)),
             },
             new Axis
             {
-                Name = "Requests/s",
+                Name = Labels.RequestsAxis,
+                NameTextSize = 10,
+                NamePaint = new SolidColorPaint(Blue),
                 Position = AxisPosition.End,
                 MinLimit = 0,
                 Labeler = v => Formatting.Count((long)v),
-                TextSize = 11,
+                TextSize = 9,
                 LabelsPaint = new SolidColorPaint(Blue),
                 ShowSeparatorLines = false,
             },
@@ -232,7 +234,8 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     public bool IsWindow5 => !IsCumulative && WindowSeconds == 5;
     public bool IsWindow60 => !IsCumulative && WindowSeconds == 60;
     public bool IsWindow300 => !IsCumulative && WindowSeconds == 300;
-    public string ShareHeader => SortBy == ProcessSort.Bytes ? "SHARE (BYTES)" : "SHARE (REQ)";
+    /// <summary>Which share bar is primary: data when sorted by a byte column, requests otherwise.</summary>
+    public ProcessSort ShareMetric => SortBy is ProcessSort.Bytes or ProcessSort.Read or ProcessSort.Write ? ProcessSort.Bytes : ProcessSort.Ops;
 
     public bool HasFilter => !string.IsNullOrWhiteSpace(FilterText) || SelectedProcessCount > 0;
 
@@ -255,17 +258,6 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
             return parts.Count == 0 ? "all processes" : string.Join(", ", parts);
         }
     }
-
-    public string SortIndicatorOps => Indicator(ProcessSort.Ops);
-    public string SortIndicatorBytes => Indicator(ProcessSort.Bytes);
-    public string SortIndicatorName => Indicator(ProcessSort.Name);
-    public string SortIndicatorPid => Indicator(ProcessSort.Pid);
-    public string SortIndicatorRead => Indicator(ProcessSort.Read);
-    public string SortIndicatorWrite => Indicator(ProcessSort.Write);
-    public string SortIndicatorShare => Indicator(ProcessSort.Share);
-    public string SortIndicatorTopFile => Indicator(ProcessSort.TopFile);
-
-    private string Indicator(ProcessSort column) => SortBy == column ? (SortDescending ? " \u25BC" : " \u25B2") : string.Empty;
 
     private string WindowText => WindowSeconds >= 60 ? $"{WindowSeconds / 60} min" : $"{WindowSeconds} s";
 
@@ -452,6 +444,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
 
         AppendPoint(snapshot);
         TrimChart();
+        UpdateDataAxisUnit();
         UpdateXLimits(snapshot.Timestamp);
 
         if (FrozenAt is null)
@@ -556,6 +549,16 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         }
     }
 
+    /// <summary>
+    /// The data axis uses one unit for all its labels (chosen from the visible maximum), so the
+    /// ticks read "10 MB/s, 20 MB/s" rather than a mix of KB/s and MB/s.
+    /// </summary>
+    private void UpdateDataAxisUnit()
+    {
+        var max = ReadValues.Concat(WriteValues).Select(p => p.Value ?? 0).DefaultIfEmpty(0).Max();
+        _dataAxisUnit = Formatting.UnitFor(max);
+    }
+
     private void UpdateXLimits(DateTimeOffset latest)
     {
         var end = latest.LocalDateTime;
@@ -581,6 +584,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
             last = snapshot;
         }
 
+        UpdateDataAxisUnit();
         if (last is not null)
         {
             UpdateXLimits(last.Timestamp);
@@ -615,12 +619,12 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         IReadOnlyList<ProcessIo> rows = IsCumulative
             ? _buffer.AggregateCumulative(disk)
             : FrozenAt is { } frozen
-                ? AggregateEndingAt(disk, frozen, WindowSeconds)
+                ? _buffer.AggregateEndingAt(disk, frozen, WindowSeconds)
                 : _buffer.AggregateProcesses(disk, WindowSeconds);
 
-        var shareMetric = SortBy == ProcessSort.Bytes ? (Func<ProcessIo, long>)(r => r.TotalBytes) : r => r.TotalOps;
         var visible = rows.Where(r => (r.TotalBytes > 0 || r.TotalOps > 0) && MatchesText(r)).ToList();
-        var total = visible.Sum(shareMetric);
+        var totalOps = visible.Sum(r => r.TotalOps);
+        var totalBytes = visible.Sum(r => r.TotalBytes);
 
         // Update in place: existing rows (keyed by PID) keep their visuals and selection and are
         // moved into sorted position; only genuinely new processes allocate a row.
@@ -635,12 +639,12 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         {
             if (byPid.TryGetValue(io.Pid, out var existing))
             {
-                existing.Update(io, total, SortBy);
+                existing.Update(io, totalOps, totalBytes, ShareMetric);
                 updated.Add(existing);
             }
             else
             {
-                updated.Add(new ProcessRowViewModel(io, total, SortBy, this));
+                updated.Add(new ProcessRowViewModel(io, totalOps, totalBytes, ShareMetric, this));
             }
         }
 
@@ -687,35 +691,6 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         HasProcesses = Processes.Count > 0;
     }
 
-    /// <summary>Window aggregation for a frozen second: the last <paramref name="seconds"/> snapshots not after <paramref name="end"/>.</summary>
-    private List<ProcessIo> AggregateEndingAt(int disk, DateTimeOffset end, int seconds)
-    {
-        var slice = _buffer.All().Where(s => s.Timestamp <= end).TakeLast(seconds);
-        var byPid = new Dictionary<int, (string Name, long Read, long Write, long ReadOps, long WriteOps, List<string> Files)>();
-        foreach (var snapshot in slice)
-        {
-            if (!snapshot.ProcessIoByDisk.TryGetValue(disk, out var ios))
-            {
-                continue;
-            }
-
-            foreach (var io in ios)
-            {
-                var acc = byPid.GetValueOrDefault(io.Pid, (io.ProcessName, 0, 0, 0, 0, new List<string>()));
-                foreach (var f in io.TopFiles.Where(f => !acc.Files.Contains(f, StringComparer.OrdinalIgnoreCase)))
-                {
-                    acc.Files.Insert(0, f);
-                }
-
-                byPid[io.Pid] = (io.ProcessName, acc.Read + io.ReadBytes, acc.Write + io.WriteBytes, acc.ReadOps + io.ReadOps, acc.WriteOps + io.WriteOps, acc.Files);
-            }
-        }
-
-        return byPid
-            .Select(kv => new ProcessIo(kv.Key, kv.Value.Name, kv.Value.Read, kv.Value.Write, kv.Value.Files.Take(SnapshotRingBuffer.TopFilesPerProcess).ToList(), kv.Value.ReadOps, kv.Value.WriteOps))
-            .ToList();
-    }
-
     private DiskSnapshot? Nearest(DateTimeOffset timestamp) =>
         _buffer.All().MinBy(s => Math.Abs((s.Timestamp - timestamp).Ticks));
 
@@ -748,7 +723,15 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
                 {
                     [0] =
                     [
-                        new ProcessIo(4321, "chrome", 2_400_000, 900_000, [@"C:\Users\Me\AppData\Local\Google\Chrome\User Data\Default\Cache\f_00012a"], 700, 120),
+                        new ProcessIo(4321, "chrome", 2_400_000, 900_000, [@"C:\Users\Me\AppData\Local\Google\Chrome\User Data\Default\Cache\f_00012a"], 700, 120)
+                        {
+                            Files =
+                            [
+                                new FileIo(@"C:\Users\Me\AppData\Local\Google\Chrome\User Data\Default\Cache\f_00012a", 2_000_000, 500),
+                                new FileIo(@"C:\Users\Me\AppData\Local\Google\Chrome\User Data\Default\History", 300_000, 200),
+                                new FileIo(string.Empty, 1_000_000, 120),
+                            ],
+                        },
                         new ProcessIo(1200, "MsMpEng", 8_100_000, 0, [@"C:\Windows\System32\drivers\etc\hosts"], 90, 0),
                         new ProcessIo(777, "devenv", 300_000, 5_200_000, [@"C:\src\app\bin\Debug\net8.0\app.dll"], 40, 800),
                     ],

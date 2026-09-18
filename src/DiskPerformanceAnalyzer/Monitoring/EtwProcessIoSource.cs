@@ -158,21 +158,33 @@ public sealed class EtwProcessIoSource : IDisposable
                     result[disk] = list;
                 }
 
-                var topFiles = new List<string>(TopFilesPerProcess);
-                foreach (var key in bucket.Files.OrderByDescending(f => f.Value).Select(f => f.Key))
+                // Every named file keeps its own counts (the folder breakdown needs them); keys the
+                // kernel never named (paging, $Mft, cache flushes) collapse into one unnamed entry.
+                var files = new Dictionary<string, FileIo>(bucket.Files.Count, StringComparer.OrdinalIgnoreCase);
+                long unnamedBytes = 0, unnamedOps = 0;
+                foreach (var (key, counts) in bucket.Files)
                 {
                     var name = parser?.FileIDToFileName(key);
-                    if (!string.IsNullOrEmpty(name) && !topFiles.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(name))
                     {
-                        topFiles.Add(name);
-                        if (topFiles.Count == TopFilesPerProcess)
-                        {
-                            break;
-                        }
+                        unnamedBytes += counts.Bytes;
+                        unnamedOps += counts.Ops;
+                        continue;
                     }
+
+                    files[name] = files.TryGetValue(name, out var existing)
+                        ? existing with { Bytes = existing.Bytes + counts.Bytes, Ops = existing.Ops + counts.Ops }
+                        : new FileIo(name, counts.Bytes, counts.Ops);
                 }
 
-                list.Add(new ProcessIo(pid, ResolveProcessName(pid), bucket.Read, bucket.Write, topFiles, bucket.ReadOps, bucket.WriteOps));
+                var ranked = files.Values.OrderByDescending(f => f.Ops).ThenByDescending(f => f.Bytes).ToList();
+                if (unnamedOps > 0 || unnamedBytes > 0)
+                {
+                    ranked.Add(new FileIo(string.Empty, unnamedBytes, unnamedOps));
+                }
+
+                var topFiles = ranked.Where(f => !f.IsUnnamed).Take(TopFilesPerProcess).Select(f => f.Path).ToList();
+                list.Add(new ProcessIo(pid, ResolveProcessName(pid), bucket.Read, bucket.Write, topFiles, bucket.ReadOps, bucket.WriteOps) { Files = ranked });
             }
 
             if (!_disposed)
@@ -264,7 +276,8 @@ public sealed class EtwProcessIoSource : IDisposable
             if (fileKey != 0
                 && (bucket.Files.Count < MaxFilesPerBucket || bucket.Files.ContainsKey(fileKey)))
             {
-                bucket.Files[fileKey] = bucket.Files.GetValueOrDefault(fileKey) + size;
+                var counts = bucket.Files.GetValueOrDefault(fileKey);
+                bucket.Files[fileKey] = (counts.Bytes + size, counts.Ops + 1);
             }
         }
     }
@@ -343,6 +356,6 @@ public sealed class EtwProcessIoSource : IDisposable
         public long Write;
         public long ReadOps;
         public long WriteOps;
-        public Dictionary<ulong, long> Files { get; } = new();
+        public Dictionary<ulong, (long Bytes, long Ops)> Files { get; } = new();
     }
 }

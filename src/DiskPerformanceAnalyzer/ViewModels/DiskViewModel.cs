@@ -9,7 +9,7 @@ using SkiaSharp;
 
 namespace DiskPerformanceAnalyzer.ViewModels;
 
-/// <summary>One physical disk in the left rail: name, current request rate and throughput, and a 60 s IOPS sparkline.</summary>
+/// <summary>One physical disk in the left rail: name, current requests/s and data rate (read/write split), and a 60 s requests sparkline.</summary>
 public partial class DiskViewModel : ObservableObject
 {
     public const int SparklineLength = 60;
@@ -55,12 +55,19 @@ public partial class DiskViewModel : ObservableObject
     public Axis[] SparkXAxes { get; }
     public Axis[] SparkYAxes { get; }
 
-    public string IopsText => Formatting.Iops(OpsPerSec);
+    /// <summary>Headline number without unit; the unit sits in its own, never-moving label.</summary>
+    public string IopsText => Formatting.CountPerSec(OpsPerSec);
+    public string ReadOpsText => Formatting.CountPerSec(ReadsPerSec);
+    public string WriteOpsText => Formatting.CountPerSec(WritesPerSec);
     public string ReadRateText => Formatting.Rate(ReadBytesPerSec);
     public string WriteRateText => Formatting.Rate(WriteBytesPerSec);
-    public string ThroughputText => $"R {ReadRateText}   W {WriteRateText}";
-    public string IopsDetailText =>
-        $"{Formatting.Count((long)ReadsPerSec)} read / {Formatting.Count((long)WritesPerSec)} write req/s, queue {QueueLength.ToString("0.0", CultureInfo.InvariantCulture)}";
+    public string QueueText => QueueLength.ToString("0.0", CultureInfo.InvariantCulture);
+
+    public string CardTooltip =>
+        $"{Name}\n" +
+        $"{Labels.Requests}: {Formatting.Iops(OpsPerSec)}  ·  {Labels.Read} {ReadOpsText}  {Labels.Write} {WriteOpsText}\n" +
+        $"{Labels.Data}: {Formatting.Rate(ReadBytesPerSec + WriteBytesPerSec)}  ·  {Labels.Read} {ReadRateText}  {Labels.Write} {WriteRateText}\n" +
+        $"Queue length {QueueText}";
 
     public static string DisplayName(int diskNumber, IReadOnlyList<string> driveLetters) =>
         driveLetters.Count == 0
@@ -88,9 +95,11 @@ public partial class DiskViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(IopsText));
+        OnPropertyChanged(nameof(ReadOpsText));
+        OnPropertyChanged(nameof(WriteOpsText));
         OnPropertyChanged(nameof(ReadRateText));
         OnPropertyChanged(nameof(WriteRateText));
-        OnPropertyChanged(nameof(ThroughputText));
-        OnPropertyChanged(nameof(IopsDetailText));
+        OnPropertyChanged(nameof(QueueText));
+        OnPropertyChanged(nameof(CardTooltip));
     }
 }

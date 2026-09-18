@@ -63,7 +63,19 @@ public sealed class EtwProcessIoSource : IDisposable
     {
         StopStaleSession();
 
-        var session = new TraceEventSession(SessionName) { StopOnDispose = true };
+        // Real-time session (no FileName): events are consumed in memory and never written to
+        // disk, so the monitor does not add to the load it measures. 16 MB of kernel buffers is
+        // plenty for DiskIO + DiskFileIO; the default 64 MB only costs non-paged pool.
+        var session = new TraceEventSession(SessionName)
+        {
+            StopOnDispose = true,
+            BufferSizeMB = 16,
+        };
+        if (!session.IsRealTime)
+        {
+            throw new InvalidOperationException("ETW session must be real-time; a file-backed session would write to the disk under observation.");
+        }
+
         session.EnableKernelProvider(Keywords);
         session.Source.Kernel.DiskIORead += OnRead;
         session.Source.Kernel.DiskIOWrite += OnWrite;
@@ -159,7 +171,7 @@ public sealed class EtwProcessIoSource : IDisposable
                     }
                 }
 
-                list.Add(new ProcessIo(pid, ResolveProcessName(pid), bucket.Read, bucket.Write, topFiles));
+                list.Add(new ProcessIo(pid, ResolveProcessName(pid), bucket.Read, bucket.Write, topFiles, bucket.ReadOps, bucket.WriteOps));
             }
 
             if (!_disposed)
@@ -240,10 +252,12 @@ public sealed class EtwProcessIoSource : IDisposable
             if (isWrite)
             {
                 bucket.Write += size;
+                bucket.WriteOps++;
             }
             else
             {
                 bucket.Read += size;
+                bucket.ReadOps++;
             }
 
             if (fileKey != 0
@@ -326,6 +340,8 @@ public sealed class EtwProcessIoSource : IDisposable
     {
         public long Read;
         public long Write;
+        public long ReadOps;
+        public long WriteOps;
         public Dictionary<ulong, long> Files { get; } = new();
     }
 }

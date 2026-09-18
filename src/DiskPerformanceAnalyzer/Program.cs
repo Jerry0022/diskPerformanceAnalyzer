@@ -16,6 +16,9 @@ sealed class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            // Redirection-surface rendering instead of the WinUI compositor: the compositor
+            // thread otherwise burns ~5 % of a core keeping frames flowing for a 1 Hz dashboard.
+            .With(new Win32PlatformOptions { CompositionMode = [Win32CompositionMode.RedirectionSurface] })
             .WithInterFont()
             .LogToTrace();
 }

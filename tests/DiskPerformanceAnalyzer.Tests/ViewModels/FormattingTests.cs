@@ -36,3 +36,24 @@ public class FormattingTests
         Assert.Equal(expected, Formatting.Percent(value));
     }
 }
+
+public class CountFormattingTests
+{
+    [Theory]
+    [InlineData(0, "0")]
+    [InlineData(340, "340")]
+    [InlineData(9_999, "9999")]
+    [InlineData(12_345, "12.3k")]
+    [InlineData(1_234_567, "1.2M")]
+    public void Count_UsesCompactSuffixes(long count, string expected)
+    {
+        Assert.Equal(expected, Formatting.Count(count));
+    }
+
+    [Fact]
+    public void Iops_AppendsUnit()
+    {
+        Assert.Equal("340 IOPS", Formatting.Iops(340.4));
+        Assert.Equal("0 IOPS", Formatting.Iops(double.NaN));
+    }
+}

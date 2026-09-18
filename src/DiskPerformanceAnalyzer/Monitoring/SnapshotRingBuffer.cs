@@ -6,7 +6,7 @@ namespace DiskPerformanceAnalyzer.Monitoring;
 /// </summary>
 public sealed class SnapshotRingBuffer
 {
-    public const int DefaultCapacity = 60;
+    public const int DefaultCapacity = 300;
     public const int TopFilesPerProcess = 3;
     /// <summary>Upper bound of distinct file paths tracked per process before pruning.</summary>
     public const int MaxTrackedFilesPerProcess = 64;
@@ -154,6 +154,8 @@ public sealed class SnapshotRingBuffer
 
         acc.Read += io.ReadBytes;
         acc.Write += io.WriteBytes;
+        acc.ReadOps += io.ReadOps;
+        acc.WriteOps += io.WriteOps;
         acc.ProcessName = io.ProcessName;
 
         // TopFiles carry no byte counts; rank by position (index 0 = hottest) weighted by the
@@ -187,7 +189,7 @@ public sealed class SnapshotRingBuffer
                 .Take(TopFilesPerProcess)
                 .Select(f => f.Key)
                 .ToList();
-            list.Add(new ProcessIo(pid, acc.ProcessName, acc.Read, acc.Write, topFiles));
+            list.Add(new ProcessIo(pid, acc.ProcessName, acc.Read, acc.Write, topFiles, acc.ReadOps, acc.WriteOps));
         }
 
         list.Sort((a, b) => b.TotalBytes.CompareTo(a.TotalBytes));
@@ -201,6 +203,8 @@ public sealed class SnapshotRingBuffer
         public string ProcessName { get; set; }
         public long Read;
         public long Write;
+        public long ReadOps;
+        public long WriteOps;
         public Dictionary<string, long> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

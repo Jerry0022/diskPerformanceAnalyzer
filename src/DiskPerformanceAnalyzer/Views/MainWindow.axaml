@@ -101,17 +101,24 @@
                     <TextBlock Classes="h1" Text="Disks" />
                     <TextBlock Classes="muted" FontSize="12" Text="% active time, like Task Manager" />
                 </StackPanel>
-                <TextBlock DockPanel.Dock="Bottom" Classes="muted" FontSize="11" Text="{Binding StatusText}" Margin="0,12,0,0" />
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" Spacing="2">
+                    <TextBlock Classes="muted" FontSize="11" Text="{Binding SelfLoadText}" ToolTip.Tip="The monitor's own disk footprint. The ETW session is real-time only (no trace file) and nothing is logged, so this should stay at zero." />
+                    <TextBlock Classes="muted" FontSize="11" Text="{Binding StatusText}" />
+                </StackPanel>
                 <ListBox ItemsSource="{Binding Disks}" SelectedItem="{Binding SelectedDisk}"
                          Classes="disks" Background="Transparent" BorderThickness="0" Padding="0">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:DiskViewModel">
                             <Border Classes="card" CornerRadius="10" BorderThickness="1" Padding="14,12" Cursor="Hand">
-                                <Grid RowDefinitions="Auto,Auto,Auto,44">
+                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,44">
                                     <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
-                                    <TextBlock Grid.Row="1" Text="{Binding ActivePercentText}" FontSize="34" FontWeight="Light" Margin="0,2,0,0" />
+                                    <DockPanel Grid.Row="1" Margin="0,2,0,0">
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding IopsText}" FontSize="15" FontWeight="SemiBold" Foreground="#4CC38A" VerticalAlignment="Bottom" Margin="0,0,0,7" ToolTip.Tip="{Binding IopsDetailText}" />
+                                        <TextBlock Text="{Binding ActivePercentText}" FontSize="34" FontWeight="Light" />
+                                    </DockPanel>
                                     <TextBlock Grid.Row="2" Classes="muted" FontSize="11" Text="{Binding ThroughputText}" />
-                                    <lvc:CartesianChart Grid.Row="3" Margin="-6,6,-6,-6"
+                                    <TextBlock Grid.Row="3" Classes="muted" FontSize="11" Text="{Binding IopsDetailText}" />
+                                    <lvc:CartesianChart Grid.Row="4" Margin="-6,6,-6,-6"
                                                         Series="{Binding SparkSeries}"
                                                         XAxes="{Binding SparkXAxes}"
                                                         YAxes="{Binding SparkYAxes}"
@@ -143,11 +150,17 @@
                             <Button Command="{Binding GoLiveCommand}" Content="Live" Classes="mini" Background="#F2B94C" Foreground="#1B1F27" FontWeight="SemiBold" />
                         </StackPanel>
                     </Border>
+                    <Border Background="#1D222C" CornerRadius="8" Padding="3" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <Button Classes="seg" Classes.active="{Binding IsChartThroughput}" Content="MB/s" Command="{Binding SelectChartMetricCommand}" CommandParameter="bytes" />
+                            <Button Classes="seg" Classes.active="{Binding IsChartIops}" Content="IOPS" Command="{Binding SelectChartMetricCommand}" CommandParameter="iops" />
+                        </StackPanel>
+                    </Border>
                     <Button Command="{Binding TogglePauseCommand}" Content="{Binding PauseButtonText}" Classes="mini" MinWidth="72" />
                 </StackPanel>
                 <StackPanel>
                     <TextBlock Classes="h1" Text="{Binding SelectedDiskTitle}" />
-                    <TextBlock Classes="muted" FontSize="12" Text="Last 60 seconds. Click anywhere on the chart to freeze that second and see who was responsible." />
+                    <TextBlock Classes="muted" FontSize="12" Text="Last 60 seconds. Click the chart to freeze a second and see who was responsible." TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </DockPanel>
 
@@ -174,10 +187,17 @@
             <DockPanel Grid.Row="2" Margin="0,14,0,6">
                 <Border DockPanel.Dock="Right" Background="#1D222C" CornerRadius="8" Padding="3" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="2">
-                        <Button Classes="seg" Classes.active="{Binding IsWindow1}" Content="1 s" Command="{Binding SelectWindowCommand}" CommandParameter="1" />
                         <Button Classes="seg" Classes.active="{Binding IsWindow5}" Content="5 s" Command="{Binding SelectWindowCommand}" CommandParameter="5" />
-                        <Button Classes="seg" Classes.active="{Binding IsWindow60}" Content="60 s" Command="{Binding SelectWindowCommand}" CommandParameter="60" />
+                        <Button Classes="seg" Classes.active="{Binding IsWindow60}" Content="1 min" Command="{Binding SelectWindowCommand}" CommandParameter="60" />
+                        <Button Classes="seg" Classes.active="{Binding IsWindow300}" Content="5 min" Command="{Binding SelectWindowCommand}" CommandParameter="300" />
                         <Button Classes="seg" Classes.active="{Binding IsCumulative}" Content="&#x3A3; since start" Command="{Binding SelectWindowCommand}" CommandParameter="all" />
+                    </StackPanel>
+                </Border>
+                <Border DockPanel.Dock="Right" Background="#1D222C" CornerRadius="8" Padding="3" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Order by request count (what usually saturates a disk) or by bytes">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <TextBlock Classes="muted" FontSize="11" Text="Sort" VerticalAlignment="Center" Margin="6,0,4,0" />
+                        <Button Classes="seg" Classes.active="{Binding IsSortOps}" Content="Requests" Command="{Binding SelectSortCommand}" CommandParameter="ops" />
+                        <Button Classes="seg" Classes.active="{Binding IsSortBytes}" Content="Bytes" Command="{Binding SelectSortCommand}" CommandParameter="bytes" />
                     </StackPanel>
                 </Border>
                 <StackPanel VerticalAlignment="Center">
@@ -192,15 +212,16 @@
             <Border Grid.Row="3" Background="#1D222C" CornerRadius="10" ClipToBounds="True">
                 <Grid RowDefinitions="34,*">
                     <Border Grid.Row="0" Background="#181C25" BorderBrush="#2A313D" BorderThickness="0,0,0,1">
-                        <Grid ColumnDefinitions="2*,64,96,96,104,120,3*,150">
+                        <Grid ColumnDefinitions="2*,60,90,90,80,80,130,3*,150">
                             <TextBlock Grid.Column="0" Classes="head" Text="PROCESS" />
                             <TextBlock Grid.Column="1" Classes="head num" Text="PID" />
                             <TextBlock Grid.Column="2" Classes="head num" Text="READ" />
                             <TextBlock Grid.Column="3" Classes="head num" Text="WRITE" />
-                            <TextBlock Grid.Column="4" Classes="head num" Text="TOTAL" />
-                            <TextBlock Grid.Column="5" Classes="head" Text="SHARE" />
-                            <TextBlock Grid.Column="6" Classes="head" Text="TOP FILE" />
-                            <TextBlock Grid.Column="7" Classes="head" Text="ACTIONS" />
+                            <TextBlock Grid.Column="4" Classes="head num" Text="REQUESTS" ToolTip.Tip="Number of I/O requests (reads + writes) in the window" />
+                            <TextBlock Grid.Column="5" Classes="head num" Text="TOTAL" />
+                            <TextBlock Grid.Column="6" Classes="head" Text="{Binding ShareHeader}" />
+                            <TextBlock Grid.Column="7" Classes="head" Text="TOP FILE" />
+                            <TextBlock Grid.Column="8" Classes="head" Text="ACTIONS" />
                         </Grid>
                     </Border>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -217,18 +238,19 @@
                                                 <MenuItem Header="Copy executable path" Command="{Binding CopyImagePathCommand}" />
                                             </ContextMenu>
                                         </Border.ContextMenu>
-                                        <Grid ColumnDefinitions="2*,64,96,96,104,120,3*,150">
+                                        <Grid ColumnDefinitions="2*,60,90,90,80,80,130,3*,150">
                                             <TextBlock Grid.Column="0" Classes="cell" Text="{Binding ProcessName}" FontWeight="SemiBold" ToolTip.Tip="{Binding ImagePathTooltip}" />
                                             <TextBlock Grid.Column="1" Classes="cell num muted" Text="{Binding Pid}" />
                                             <TextBlock Grid.Column="2" Classes="cell num" Text="{Binding ReadText}" Foreground="#4CC38A" />
                                             <TextBlock Grid.Column="3" Classes="cell num" Text="{Binding WriteText}" Foreground="#F29E4C" />
-                                            <TextBlock Grid.Column="4" Classes="cell num" Text="{Binding TotalText}" FontWeight="SemiBold" />
-                                            <Grid Grid.Column="5" ColumnDefinitions="*,40" Margin="8,0" VerticalAlignment="Center">
+                                            <TextBlock Grid.Column="4" Classes="cell num" Text="{Binding TotalOpsText}" FontWeight="SemiBold" ToolTip.Tip="{Binding OpsTooltip}" />
+                                            <TextBlock Grid.Column="5" Classes="cell num" Text="{Binding TotalText}" />
+                                            <Grid Grid.Column="6" ColumnDefinitions="*,40" Margin="8,0" VerticalAlignment="Center">
                                                 <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding Share}" Height="6" MinWidth="0" Foreground="#3B8EEA" Background="#2A313D" />
                                                 <TextBlock Grid.Column="1" Classes="num muted" FontSize="11" Text="{Binding ShareText}" VerticalAlignment="Center" />
                                             </Grid>
-                                            <TextBlock Grid.Column="6" Classes="cell muted" Text="{Binding TopFileText}" ToolTip.Tip="{Binding TopFileTooltip}" />
-                                            <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0">
+                                            <TextBlock Grid.Column="7" Classes="cell muted" Text="{Binding TopFileText}" ToolTip.Tip="{Binding TopFileTooltip}" />
+                                            <StackPanel Grid.Column="8" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0">
                                                 <Button Classes="mini" Content="Exe" Command="{Binding OpenInExplorerCommand}" ToolTip.Tip="Open the executable in Explorer" />
                                                 <Button Classes="mini" Content="File" Command="{Binding OpenFileLocationCommand}" ToolTip.Tip="Open the top file's folder in Explorer" />
                                                 <Button Classes="mini" Content="Copy" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the top file path" />

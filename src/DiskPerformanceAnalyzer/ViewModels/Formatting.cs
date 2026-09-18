@@ -38,6 +38,33 @@ public static class Formatting
         return Bytes(rounded) + "/s";
     }
 
+    /// <summary>Request counts: "340", "12.3k", "1.2M".</summary>
+    public static string Count(long count)
+    {
+        if (count < 0)
+        {
+            return "-" + Count(-count);
+        }
+
+        return count switch
+        {
+            < 10_000 => string.Create(CultureInfo.InvariantCulture, $"{count}"),
+            < 1_000_000 => string.Create(CultureInfo.InvariantCulture, $"{count / 1000.0:0.0}k"),
+            _ => string.Create(CultureInfo.InvariantCulture, $"{count / 1_000_000.0:0.0}M"),
+        };
+    }
+
+    /// <summary>I/O requests per second: "340 IOPS", "12.3k IOPS".</summary>
+    public static string Iops(double opsPerSecond)
+    {
+        if (double.IsNaN(opsPerSecond) || double.IsInfinity(opsPerSecond))
+        {
+            return "0 IOPS";
+        }
+
+        return Count((long)Math.Round(Math.Max(0, opsPerSecond))) + " IOPS";
+    }
+
     public static string Percent(double percent) =>
         string.Create(CultureInfo.InvariantCulture, $"{Math.Clamp(percent, 0, 100):0}%");
 }

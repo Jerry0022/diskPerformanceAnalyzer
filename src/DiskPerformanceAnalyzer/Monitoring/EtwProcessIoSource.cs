@@ -128,33 +128,44 @@ public sealed class EtwProcessIoSource : IDisposable
     /// </summary>
     public Dictionary<int, List<ProcessIo>> DrainSecond()
     {
-        Dictionary<(int Disk, int Pid), Bucket> drained;
+        var result = new Dictionary<int, List<ProcessIo>>();
         lock (_gate)
         {
-            drained = _buckets;
+            var drained = _buckets;
             _buckets = new Dictionary<(int, int), Bucket>(drained.Count);
+
+            // Resolve FileKey -> path only now, for the few hottest keys per bucket, using the
+            // parser that recorded them (before a possible session recycle below discards it).
+            var parser = _session?.Source.Kernel;
+            foreach (var ((disk, pid), bucket) in drained)
+            {
+                if (!result.TryGetValue(disk, out var list))
+                {
+                    list = new List<ProcessIo>();
+                    result[disk] = list;
+                }
+
+                var topFiles = new List<string>(TopFilesPerProcess);
+                foreach (var key in bucket.Files.OrderByDescending(f => f.Value).Select(f => f.Key))
+                {
+                    var name = parser?.FileIDToFileName(key);
+                    if (!string.IsNullOrEmpty(name) && !topFiles.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    {
+                        topFiles.Add(name);
+                        if (topFiles.Count == TopFilesPerProcess)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                list.Add(new ProcessIo(pid, ResolveProcessName(pid), bucket.Read, bucket.Write, topFiles));
+            }
+
             if (!_disposed)
             {
                 MaintainLocked();
             }
-        }
-
-        var result = new Dictionary<int, List<ProcessIo>>();
-        foreach (var ((disk, pid), bucket) in drained)
-        {
-            if (!result.TryGetValue(disk, out var list))
-            {
-                list = new List<ProcessIo>();
-                result[disk] = list;
-            }
-
-            var topFiles = bucket.Files
-                .OrderByDescending(f => f.Value)
-                .Take(TopFilesPerProcess)
-                .Select(f => f.Key)
-                .ToList();
-
-            list.Add(new ProcessIo(pid, ResolveProcessName(pid), bucket.Read, bucket.Write, topFiles));
         }
 
         foreach (var list in result.Values)
@@ -202,8 +213,10 @@ public sealed class EtwProcessIoSource : IDisposable
     {
         var key = (data.DiskNumber, data.ProcessID);
         long size = data.TransferSize;
-        // FileName is resolved by TraceEvent from FileKey via the FileIO/DiskFileIO rundown events.
-        var fileName = data.FileName;
+        // Only the raw FileKey is stored here: resolving it to a path allocates a string per event,
+        // and at thousands of I/Os per second that dominated the pump thread. DrainSecond resolves
+        // the few hottest keys once per second instead.
+        var fileKey = data.FileKey;
         // Completion timestamp + elapsed time gives the interval this request was in flight.
         var endMs = data.TimeStamp.ToUniversalTime().Ticks / (double)TimeSpan.TicksPerMillisecond;
         var startMs = endMs - Math.Max(data.ElapsedTimeMSec, 0);
@@ -233,10 +246,10 @@ public sealed class EtwProcessIoSource : IDisposable
                 bucket.Read += size;
             }
 
-            if (!string.IsNullOrEmpty(fileName)
-                && (bucket.Files.Count < MaxFilesPerBucket || bucket.Files.ContainsKey(fileName)))
+            if (fileKey != 0
+                && (bucket.Files.Count < MaxFilesPerBucket || bucket.Files.ContainsKey(fileKey)))
             {
-                bucket.Files[fileName] = bucket.Files.GetValueOrDefault(fileName) + size;
+                bucket.Files[fileKey] = bucket.Files.GetValueOrDefault(fileKey) + size;
             }
         }
     }
@@ -313,6 +326,6 @@ public sealed class EtwProcessIoSource : IDisposable
     {
         public long Read;
         public long Write;
-        public Dictionary<string, long> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<ulong, long> Files { get; } = new();
     }
 }

@@ -90,7 +90,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
                 GeometryStroke = null,
                 GeometrySize = 0,
                 LineSmoothness = 0,
-                AnimationsSpeed = TimeSpan.FromMilliseconds(250),
+                AnimationsSpeed = TimeSpan.Zero,
                 YToolTipLabelFormatter = p => $"{p.Model?.Value ?? 0:0}% active",
             },
             new LineSeries<DateTimePoint>
@@ -104,7 +104,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
                 GeometryStroke = null,
                 GeometrySize = 0,
                 LineSmoothness = 0,
-                AnimationsSpeed = TimeSpan.FromMilliseconds(250),
+                AnimationsSpeed = TimeSpan.Zero,
                 YToolTipLabelFormatter = p => "Read " + Formatting.Rate(p.Model?.Value ?? 0),
             },
             new LineSeries<DateTimePoint>
@@ -118,7 +118,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
                 GeometryStroke = null,
                 GeometrySize = 0,
                 LineSmoothness = 0,
-                AnimationsSpeed = TimeSpan.FromMilliseconds(250),
+                AnimationsSpeed = TimeSpan.Zero,
                 YToolTipLabelFormatter = p => "Write " + Formatting.Rate(p.Model?.Value ?? 0),
             },
             new LineSeries<DateTimePoint>
@@ -402,11 +402,14 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         }
     }
 
+    /// <summary>Rows shown in the process table; anything beyond this is noise and costs layout time every second.</summary>
+    public const int MaxProcessRows = 40;
+
     private void RefreshProcesses()
     {
-        Processes.Clear();
         if (SelectedDisk is null)
         {
+            Processes.Clear();
             HasProcesses = false;
             return;
         }
@@ -419,9 +422,43 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
                 : _buffer.AggregateProcesses(disk, WindowSeconds);
 
         var total = rows.Sum(r => r.TotalBytes);
-        foreach (var io in rows.Where(r => r.TotalBytes > 0).OrderByDescending(r => r.TotalBytes))
+        var ordered = rows
+            .Where(r => r.TotalBytes > 0)
+            .OrderByDescending(r => r.TotalBytes)
+            .Take(MaxProcessRows)
+            .ToList();
+
+        // Update in place: existing rows (keyed by PID) keep their visuals and are moved into
+        // position; only genuinely new processes allocate a row. Rebuilding the collection
+        // every second re-templated every row (context menu, buttons, tooltips) and was the
+        // main source of UI-thread CPU and garbage.
+        var byPid = new Dictionary<int, ProcessRowViewModel>(Processes.Count);
+        foreach (var row in Processes)
         {
-            Processes.Add(new ProcessRowViewModel(io, total, this));
+            byPid[row.Pid] = row;
+        }
+
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            var io = ordered[index];
+            if (byPid.TryGetValue(io.Pid, out var existing))
+            {
+                existing.Update(io, total);
+                var current = Processes.IndexOf(existing);
+                if (current != index)
+                {
+                    Processes.Move(current, index);
+                }
+            }
+            else
+            {
+                Processes.Insert(index, new ProcessRowViewModel(io, total, this));
+            }
+        }
+
+        while (Processes.Count > ordered.Count)
+        {
+            Processes.RemoveAt(Processes.Count - 1);
         }
 
         HasProcesses = Processes.Count > 0;

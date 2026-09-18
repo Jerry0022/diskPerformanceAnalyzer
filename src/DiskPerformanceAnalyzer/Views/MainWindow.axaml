@@ -118,6 +118,8 @@
                                                         TooltipPosition="Hidden"
                                                         LegendPosition="Hidden"
                                                         ZoomMode="None"
+                                                        AnimationsSpeed="0:0:0"
+                                                        EasingFunction="{x:Null}"
                                                         IsHitTestVisible="False"
                                                         Background="Transparent" />
                                 </Grid>
@@ -159,6 +161,8 @@
                                         LegendPosition="Top"
                                         TooltipPosition="Top"
                                         ZoomMode="None"
+                                        AnimationsSpeed="0:0:0"
+                                        EasingFunction="{x:Null}"
                                         Cursor="Cross"
                                         Background="Transparent" />
                     <TextBlock IsVisible="{Binding !HasSelection}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"

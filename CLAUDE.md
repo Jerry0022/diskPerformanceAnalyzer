@@ -13,6 +13,7 @@ Microsoft.Diagnostics.Tracing.TraceEvent · PerformanceCounter for throughput/qu
 - Run:   `dotnet run --project src/DiskPerformanceAnalyzer`
 - Test:  `dotnet test DiskPerformanceAnalyzer.sln`
 - Lint:  `dotnet format DiskPerformanceAnalyzer.sln --verify-no-changes`
+- Release: `git tag vX.Y.Z && git push origin vX.Y.Z` — GitHub Actions publishes the single-file exe + zip to a Release
 
 ## Conventions
 - Data layer (ETW/PerfCounter) has no Avalonia dependency — testable without UI.

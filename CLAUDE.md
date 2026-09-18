@@ -6,7 +6,7 @@ Explorer". Not capacity/storage analysis — never count gigabytes.
 
 ## Stack
 .NET 8 · Avalonia 12 (MVVM, CommunityToolkit.Mvvm) · xunit · ETW via
-Microsoft.Diagnostics.Tracing.TraceEvent · PerformanceCounter for disk % active
+Microsoft.Diagnostics.Tracing.TraceEvent · PerformanceCounter for throughput/queue; % active derived from ETW
 
 ## Commands
 - Build: `dotnet build DiskPerformanceAnalyzer.sln`
@@ -16,7 +16,7 @@ Microsoft.Diagnostics.Tracing.TraceEvent · PerformanceCounter for disk % active
 
 ## Conventions
 - Data layer (ETW/PerfCounter) has no Avalonia dependency — testable without UI.
-- ETW kernel session requires admin; degrade gracefully (counters only) when not elevated.
+- App always runs elevated (requireAdministrator) — ETW kernel session needs it; no fallback mode.
 - Project artifacts in English; chat with the user in German.
 
 ## References

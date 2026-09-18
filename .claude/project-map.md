@@ -10,7 +10,7 @@
 src/  (11) — Source code
   DiskPerformanceAnalyzer/  (11)
     Assets/  (1)
-    ViewModels/  (2)
+    ViewModels/  (6: MainViewModel, DiskViewModel, ProcessRowViewModel, Formatting, PlatformStubs [temp], ViewModelBase)
     Views/  (2)
 tests/  (2) — Tests
   DiskPerformanceAnalyzer.Tests/  (2)

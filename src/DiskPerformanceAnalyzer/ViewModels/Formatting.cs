@@ -65,6 +65,27 @@ public static class Formatting
         return Count((long)Math.Round(Math.Max(0, opsPerSecond))) + " IOPS";
     }
 
+    /// <summary>
+    /// Shortens a path for a table cell: the first two segments, an ellipsis, then the last
+    /// folder and the file name. <c>C:\Users\Me\AppData\Local\Cache\f_0001</c> becomes
+    /// <c>C:\Users\…\Cache\f_0001</c>. Paths with five segments or fewer are returned as-is.
+    /// </summary>
+    public static string ShortPath(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return "-";
+        }
+
+        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length <= 5)
+        {
+            return path;
+        }
+
+        return string.Join('\\', [parts[0], parts[1], "\u2026", parts[^2], parts[^1]]);
+    }
+
     public static string Percent(double percent) =>
         string.Create(CultureInfo.InvariantCulture, $"{Math.Clamp(percent, 0, 100):0}%");
 }

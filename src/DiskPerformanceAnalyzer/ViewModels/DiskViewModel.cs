@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DiskPerformanceAnalyzer.Monitoring;
 using LiveChartsCore;
@@ -8,12 +9,11 @@ using SkiaSharp;
 
 namespace DiskPerformanceAnalyzer.ViewModels;
 
-/// <summary>One physical disk in the left rail: name, current numbers and a 60 s sparkline.</summary>
+/// <summary>One physical disk in the left rail: name, current request rate and throughput, and a 60 s IOPS sparkline.</summary>
 public partial class DiskViewModel : ObservableObject
 {
     public const int SparklineLength = 60;
 
-    [ObservableProperty] private double _activePercent;
     [ObservableProperty] private double _readBytesPerSec;
     [ObservableProperty] private double _writeBytesPerSec;
     [ObservableProperty] private double _queueLength;
@@ -44,7 +44,7 @@ public partial class DiskViewModel : ObservableObject
             },
         ];
         SparkXAxes = [new Axis { IsVisible = false, MinLimit = 0, MaxLimit = SparklineLength - 1 }];
-        SparkYAxes = [new Axis { IsVisible = false, MinLimit = 0, MaxLimit = 100 }];
+        SparkYAxes = [new Axis { IsVisible = false, MinLimit = 0 }];
     }
 
     public int DiskNumber { get; }
@@ -55,12 +55,12 @@ public partial class DiskViewModel : ObservableObject
     public Axis[] SparkXAxes { get; }
     public Axis[] SparkYAxes { get; }
 
-    public string ActivePercentText => Formatting.Percent(ActivePercent);
+    public string IopsText => Formatting.Iops(OpsPerSec);
     public string ReadRateText => Formatting.Rate(ReadBytesPerSec);
     public string WriteRateText => Formatting.Rate(WriteBytesPerSec);
     public string ThroughputText => $"R {ReadRateText}   W {WriteRateText}";
-    public string IopsText => Formatting.Iops(OpsPerSec);
-    public string IopsDetailText => $"{Formatting.Iops(ReadsPerSec)} read, {Formatting.Iops(WritesPerSec)} write, queue {QueueLength.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}";
+    public string IopsDetailText =>
+        $"{Formatting.Count((long)ReadsPerSec)} read / {Formatting.Count((long)WritesPerSec)} write req/s, queue {QueueLength.ToString("0.0", CultureInfo.InvariantCulture)}";
 
     public static string DisplayName(int diskNumber, IReadOnlyList<string> driveLetters) =>
         driveLetters.Count == 0
@@ -69,7 +69,6 @@ public partial class DiskViewModel : ObservableObject
 
     public void Update(DiskSample sample)
     {
-        ActivePercent = Math.Clamp(sample.ActivePercent, 0, 100);
         ReadBytesPerSec = sample.ReadBytesPerSec;
         WriteBytesPerSec = sample.WriteBytesPerSec;
         QueueLength = sample.QueueLength;
@@ -82,17 +81,16 @@ public partial class DiskViewModel : ObservableObject
             Name = DisplayName(sample.DiskNumber, sample.DriveLetters);
         }
 
-        Sparkline.Add(ActivePercent);
+        Sparkline.Add(OpsPerSec);
         while (Sparkline.Count > SparklineLength)
         {
             Sparkline.RemoveAt(0);
         }
 
-        OnPropertyChanged(nameof(ActivePercentText));
+        OnPropertyChanged(nameof(IopsText));
         OnPropertyChanged(nameof(ReadRateText));
         OnPropertyChanged(nameof(WriteRateText));
         OnPropertyChanged(nameof(ThroughputText));
-        OnPropertyChanged(nameof(IopsText));
         OnPropertyChanged(nameof(IopsDetailText));
     }
 }

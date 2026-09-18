@@ -18,12 +18,13 @@ public sealed class EtwProcessIoSource : IDisposable
     public const string SessionName = "DiskPerformanceAnalyzer-Kernel";
     public const int TopFilesPerProcess = SnapshotRingBuffer.TopFilesPerProcess;
 
-    // DiskIO gives the per-request events; DiskFileIO gives the FileKey -> file name rundown that
-    // TraceEvent uses to resolve DiskIOTraceData.FileName. The full FileIO/FileIOInit keywords
-    // would add every file operation system-wide (thousands of events per second) for no gain.
+    // DiskIO gives the per-request events. DiskFileIO provides the FileKey -> name rundown for
+    // files already open at session start; FileIO adds names for files opened afterwards (the
+    // interesting ones). FileIOInit (every read/write call) is deliberately left out.
     private const KernelTraceEventParser.Keywords Keywords =
         KernelTraceEventParser.Keywords.DiskIO
-        | KernelTraceEventParser.Keywords.DiskFileIO;
+        | KernelTraceEventParser.Keywords.DiskFileIO
+        | KernelTraceEventParser.Keywords.FileIO;
 
     /// <summary>
     /// TraceEvent keeps every FileKey -> name mapping it has ever seen in a history dictionary that

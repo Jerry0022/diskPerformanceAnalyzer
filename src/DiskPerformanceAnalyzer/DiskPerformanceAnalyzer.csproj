@@ -7,6 +7,20 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+
+    <!-- Release metadata; CI overrides Version from the git tag (v1.2.3 -> 1.2.3) -->
+    <Version>0.1.0</Version>
+    <Product>Disk Performance Analyzer</Product>
+    <Authors>Jerry0022</Authors>
+    <Copyright>Copyright (c) 2026 Jerry0022</Copyright>
+    <Description>Task-Manager-style disk activity monitor: requests/s and throughput per physical disk, with the processes causing it.</Description>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <!-- Single-file publish: SkiaSharp/HarfBuzz native libs must be bundled; Avalonia is not trim-safe -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishTrimmed>false</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>

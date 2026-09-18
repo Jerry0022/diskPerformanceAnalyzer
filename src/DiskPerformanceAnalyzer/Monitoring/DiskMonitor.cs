@@ -79,6 +79,9 @@ public sealed class DiskMonitor : IDiskMonitor
         // ETW-derived active time is authoritative: the PhysicalDisk "% Idle Time" counter
         // reports 0 on many NVMe drives, which would pin the chart at 100 %.
         var active = _processIo.DrainActivePercent();
+        // Bytes and request counts come from the same ETW events the process table is built
+        // from, so disk totals, chart and table always agree. PerfCounter only contributes the
+        // disk list and the queue length.
         var disks = counters
             .Select(d =>
             {
@@ -86,6 +89,8 @@ public sealed class DiskMonitor : IDiskMonitor
                 return d with
                 {
                     ActivePercent = active.GetValueOrDefault(d.DiskNumber, 0.0),
+                    ReadBytesPerSec = ops?.Sum(p => p.ReadBytes) ?? 0,
+                    WriteBytesPerSec = ops?.Sum(p => p.WriteBytes) ?? 0,
                     ReadsPerSec = ops?.Sum(p => p.ReadOps) ?? 0,
                     WritesPerSec = ops?.Sum(p => p.WriteOps) ?? 0,
                 };

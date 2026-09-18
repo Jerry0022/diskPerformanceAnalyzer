@@ -28,7 +28,7 @@ public class MainViewModelTests
         Assert.Equal(10_000, vm.Processes[0].TotalBytes);
         Assert.Equal(6_000, vm.Processes[1].TotalBytes);
         Assert.True(vm.HasProcesses);
-        Assert.Equal(2, vm.ActiveValues.Count);
+        Assert.Equal(2, vm.ReadValues.Count);
         Assert.Equal(2, vm.SelectedDisk.Sparkline.Count);
     }
 

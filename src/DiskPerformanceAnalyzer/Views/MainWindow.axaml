@@ -8,12 +8,24 @@
         x:Class="DiskPerformanceAnalyzer.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Disk Performance Analyzer"
-        Width="1200" Height="720" MinWidth="1000" MinHeight="640"
+        Icon="avares://DiskPerformanceAnalyzer/Assets/app.ico"
+        Width="1280" Height="760" MinWidth="1000" MinHeight="640"
         Background="#151921">
 
     <Design.DataContext>
         <vm:MainViewModel />
     </Design.DataContext>
+
+    <Window.Resources>
+        <!-- Fluent-style glyphs as geometry so no icon font is required. -->
+        <StreamGeometry x:Key="IconFolder">M2 5.5A2.5 2.5 0 0 1 4.5 3h3.6c.6 0 1.2.2 1.6.6L11.4 5H15.5A2.5 2.5 0 0 1 18 7.5v7A2.5 2.5 0 0 1 15.5 17h-11A2.5 2.5 0 0 1 2 14.5v-9Zm2.5-1A1.5 1.5 0 0 0 3 5.5V7h14v.5A1.5 1.5 0 0 0 15.5 6h-4.3c-.4 0-.8-.2-1.1-.4L8.9 4.3a1.5 1.5 0 0 0-.8-.3H4.5ZM3 8v6.5A1.5 1.5 0 0 0 4.5 16h11a1.5 1.5 0 0 0 1.5-1.5V8H3Z</StreamGeometry>
+        <StreamGeometry x:Key="IconShare">M13 3.5a2.5 2.5 0 1 1 .6 1.6L8.1 8.4a2.5 2.5 0 0 1 0 3.2l5.5 3.3a2.5 2.5 0 1 1-.5.9l-5.6-3.4a2.5 2.5 0 1 1 0-4.8l5.6-3.4A2.5 2.5 0 0 1 13 3.5Z</StreamGeometry>
+        <StreamGeometry x:Key="IconColumns">M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15.5v-11ZM4 8v7.5c0 .3.2.5.5.5H7V8H4Zm4 0v8h4V8H8Zm5 0v8h2.5c.3 0 .5-.2.5-.5V8h-3Z</StreamGeometry>
+        <StreamGeometry x:Key="IconEye">M10 4c4 0 7.3 2.6 8.6 6-1.3 3.4-4.6 6-8.6 6S2.7 13.4 1.4 10C2.7 6.6 6 4 10 4Zm0 1.5c-3.1 0-5.8 1.9-7.1 4.5 1.3 2.6 4 4.5 7.1 4.5s5.8-1.9 7.1-4.5C15.8 7.4 13.1 5.5 10 5.5Zm0 1.5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z</StreamGeometry>
+        <StreamGeometry x:Key="IconPause">M5 3h3v14H5V3Zm7 0h3v14h-3V3Z</StreamGeometry>
+        <StreamGeometry x:Key="IconPlay">M6 3.5v13l10-6.5-10-6.5Z</StreamGeometry>
+        <StreamGeometry x:Key="IconSearch">M8.5 3a5.5 5.5 0 0 1 4.4 8.8l4.2 4.2-1.1 1.1-4.2-4.2A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z</StreamGeometry>
+    </Window.Resources>
 
     <Window.Styles>
         <Style Selector="TextBlock.muted">
@@ -23,21 +35,9 @@
             <Setter Property="FontSize" Value="20" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
-        <Style Selector="TextBlock.cell">
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-            <Setter Property="Margin" Value="8,0" />
-        </Style>
         <Style Selector="TextBlock.num">
             <Setter Property="TextAlignment" Value="Right" />
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, monospace" />
-        </Style>
-        <Style Selector="TextBlock.head">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="#8B93A1" />
-            <Setter Property="Margin" Value="8,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.seg">
             <Setter Property="Padding" Value="12,4" />
@@ -61,15 +61,61 @@
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
+        <!-- Icon-only buttons inside table cells and toolbars -->
+        <Style Selector="Button.icon">
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="MinWidth" Value="24" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#8B93A1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2A313D" />
+            <Setter Property="TextElement.Foreground" Value="#E6EAF0" />
+        </Style>
+        <Style Selector="Button.icon:disabled">
+            <Setter Property="Opacity" Value="0.25" />
+        </Style>
+        <Style Selector="Button.chartctl">
+            <Setter Property="Foreground" Value="#5B6472" />
+            <Setter Property="Padding" Value="6" />
+        </Style>
+        <Style Selector="Button.chartctl PathIcon">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+        </Style>
+        <Style Selector="Button.icon PathIcon">
+            <Setter Property="Width" Value="15" />
+            <Setter Property="Height" Value="15" />
+        </Style>
+        <!-- Column header buttons: plain text, click sorts -->
+        <Style Selector="Button.colhead">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#8B93A1" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.colhead:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="TextElement.Foreground" Value="#E6EAF0" />
+        </Style>
+        <Style Selector="Button.colhead.num">
+            <Setter Property="HorizontalContentAlignment" Value="Right" />
+        </Style>
         <Style Selector="ListBox.disks ListBoxItem">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0,0,0,8" />
             <Setter Property="CornerRadius" Value="10" />
         </Style>
-        <Style Selector="ListBox.disks ListBoxItem:selected /template/ ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style Selector="ListBox.disks ListBoxItem:pointerover /template/ ContentPresenter">
+        <Style Selector="ListBox.disks ListBoxItem:selected /template/ ContentPresenter, ListBox.disks ListBoxItem:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
         </Style>
         <Style Selector="ListBox.disks ListBoxItem Border.card">
@@ -83,23 +129,55 @@
             <Setter Property="Background" Value="#22304A" />
             <Setter Property="BorderBrush" Value="#3B8EEA" />
         </Style>
-        <Style Selector="Border.row">
+        <!-- DataGrid: dark, dense, resizable columns -->
+        <Style Selector="DataGrid">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Height" Value="40" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="RowBackground" Value="Transparent" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="HorizontalGridLinesBrush" Value="#232933" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="CanUserResizeColumns" Value="True" />
+            <Setter Property="CanUserReorderColumns" Value="True" />
+            <Setter Property="CanUserSortColumns" Value="False" />
+            <Setter Property="RowHeight" Value="42" />
+            <Setter Property="ColumnHeaderHeight" Value="38" />
+            <Setter Property="SelectionMode" Value="Extended" />
         </Style>
-        <Style Selector="Border.row:pointerover">
-            <Setter Property="Background" Value="#1D222C" />
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="Background" Value="#181C25" />
+            <Setter Property="Foreground" Value="#8B93A1" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="SeparatorBrush" Value="#2A313D" />
+            <Setter Property="AreSeparatorsVisible" Value="True" />
+        </Style>
+        <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+            <Setter Property="Fill" Value="#1D222C" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+            <Setter Property="Fill" Value="#22304A" />
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="DataGridCell">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="12,0" />
+        </Style>
+        <Style Selector="DataGridCell:focus /template/ Grid#FocusVisual">
+            <Setter Property="IsVisible" Value="False" />
         </Style>
     </Window.Styles>
 
     <Grid ColumnDefinitions="300,*">
 
         <!-- Left rail: one card per physical disk -->
-        <Border Grid.Column="0" Background="#12151C" BorderBrush="#232933" BorderThickness="0,0,1,0" Padding="16">
+        <Border Grid.Column="0" Background="#12151C" BorderBrush="#232933" BorderThickness="0,0,1,0" Padding="20,24">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,20" Spacing="2">
                     <TextBlock Classes="h1" Text="Disks" />
-                    <TextBlock Classes="muted" FontSize="12" Text="% active time, like Task Manager" />
+                    <TextBlock Classes="muted" FontSize="12" Text="Requests and throughput per physical disk" />
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" Spacing="2">
                     <TextBlock Classes="muted" FontSize="11" Text="{Binding SelfLoadText}" ToolTip.Tip="The monitor's own disk footprint. The ETW session is real-time only (no trace file) and nothing is logged, so this should stay at zero." />
@@ -109,15 +187,12 @@
                          Classes="disks" Background="Transparent" BorderThickness="0" Padding="0">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:DiskViewModel">
-                            <Border Classes="card" CornerRadius="10" BorderThickness="1" Padding="14,12" Cursor="Hand">
-                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,44">
+                            <Border Classes="card" CornerRadius="12" BorderThickness="1" Padding="16,14" Cursor="Hand">
+                                <Grid RowDefinitions="Auto,Auto,Auto,Auto,48" RowSpacing="2">
                                     <TextBlock Grid.Row="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
-                                    <DockPanel Grid.Row="1" Margin="0,2,0,0">
-                                        <TextBlock DockPanel.Dock="Right" Text="{Binding IopsText}" FontSize="15" FontWeight="SemiBold" Foreground="#4CC38A" VerticalAlignment="Bottom" Margin="0,0,0,7" ToolTip.Tip="{Binding IopsDetailText}" />
-                                        <TextBlock Text="{Binding ActivePercentText}" FontSize="34" FontWeight="Light" />
-                                    </DockPanel>
-                                    <TextBlock Grid.Row="2" Classes="muted" FontSize="11" Text="{Binding ThroughputText}" />
-                                    <TextBlock Grid.Row="3" Classes="muted" FontSize="11" Text="{Binding IopsDetailText}" />
+                                    <TextBlock Grid.Row="1" Text="{Binding IopsText}" FontSize="30" FontWeight="Light" Margin="0,2,0,0" />
+                                    <TextBlock Grid.Row="2" Classes="muted" FontSize="11" Text="{Binding IopsDetailText}" />
+                                    <TextBlock Grid.Row="3" Classes="muted" FontSize="11" Text="{Binding ThroughputText}" />
                                     <lvc:CartesianChart Grid.Row="4" Margin="-6,6,-6,-6"
                                                         Series="{Binding SparkSeries}"
                                                         XAxes="{Binding SparkXAxes}"
@@ -137,11 +212,11 @@
             </DockPanel>
         </Border>
 
-        <!-- Right: chart on top, root-cause table below -->
-        <Grid Grid.Column="1" RowDefinitions="Auto,2*,Auto,3*" Margin="20,16,20,16">
+        <!-- Right: one filter bar drives chart and table -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,2*,Auto,3*" Margin="28,24,28,24">
 
-            <!-- Header with title, frozen pill, pause -->
-            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+            <!-- Title + frozen pill + pause -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,16">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border IsVisible="{Binding IsFrozen}" Background="#3A2F14" BorderBrush="#F2B94C" BorderThickness="1" CornerRadius="14" Padding="12,4">
                         <StackPanel Orientation="Horizontal" Spacing="10">
@@ -150,22 +225,27 @@
                             <Button Command="{Binding GoLiveCommand}" Content="Live" Classes="mini" Background="#F2B94C" Foreground="#1B1F27" FontWeight="SemiBold" />
                         </StackPanel>
                     </Border>
-                    <Border Background="#1D222C" CornerRadius="8" Padding="3" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <Button Classes="seg" Classes.active="{Binding IsChartThroughput}" Content="MB/s" Command="{Binding SelectChartMetricCommand}" CommandParameter="bytes" />
-                            <Button Classes="seg" Classes.active="{Binding IsChartIops}" Content="IOPS" Command="{Binding SelectChartMetricCommand}" CommandParameter="iops" />
-                        </StackPanel>
-                    </Border>
-                    <Button Command="{Binding TogglePauseCommand}" Content="{Binding PauseButtonText}" Classes="mini" MinWidth="72" />
                 </StackPanel>
-                <StackPanel>
+                <StackPanel Spacing="4">
                     <TextBlock Classes="h1" Text="{Binding SelectedDiskTitle}" />
-                    <TextBlock Classes="muted" FontSize="12" Text="Last 60 seconds. Click the chart to freeze a second and see who was responsible." TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis">
+                        <Run Text="Showing " /><Run Text="{Binding FilterDescription}" FontWeight="SemiBold" Foreground="#B7BEC9" /><Run Text=". Type to filter, select rows to isolate them, click the chart to freeze a second." />
+                    </TextBlock>
                 </StackPanel>
             </DockPanel>
 
-            <!-- Big chart -->
-            <Border Grid.Row="1" Background="#1D222C" CornerRadius="10" Padding="8" MinHeight="200">
+            <!-- Filter bar: one prominent input drives chart and table -->
+            <Border Grid.Row="1" Margin="0,0,0,16" Background="#1D222C" BorderBrush="#3B8EEA" BorderThickness="1" CornerRadius="10" Padding="16,0" Height="46">
+                <DockPanel>
+                    <PathIcon DockPanel.Dock="Left" Data="{StaticResource IconSearch}" Width="18" Height="18" Foreground="#3B8EEA" Margin="0,0,10,0" />
+                    <Button DockPanel.Dock="Right" Classes="mini" Content="Clear filter" Command="{Binding ClearFilterCommand}" IsVisible="{Binding HasFilter}" Margin="8,0,0,0" />
+                    <TextBox Text="{Binding FilterText}" Watermark="Filter by process name or file path — chart and table follow" FontSize="14"
+                             Background="Transparent" BorderThickness="0" VerticalAlignment="Center" VerticalContentAlignment="Center" />
+                </DockPanel>
+            </Border>
+
+            <!-- Chart: throughput as areas (left axis), requests as lines (right axis) -->
+            <Border Grid.Row="2" Background="#1D222C" CornerRadius="12" Padding="12" MinHeight="180">
                 <Grid>
                     <lvc:CartesianChart x:Name="Chart"
                                         Series="{Binding Series}"
@@ -180,11 +260,38 @@
                                         Background="Transparent" />
                     <TextBlock IsVisible="{Binding !HasSelection}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"
                                Text="Waiting for the first disk sample..." />
+                    <Button Classes="icon chartctl" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
+                            Command="{Binding TogglePauseCommand}" ToolTip.Tip="{Binding PauseButtonText}">
+                        <Panel>
+                            <PathIcon Data="{StaticResource IconPause}" IsVisible="{Binding !IsPaused}" />
+                            <PathIcon Data="{StaticResource IconPlay}" IsVisible="{Binding IsPaused}" />
+                        </Panel>
+                    </Button>
+                    <Border IsVisible="{Binding IsPaused}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,4,0,0"
+                            Background="#2A313D" CornerRadius="10" Padding="10,2">
+                        <TextBlock Classes="muted" FontSize="11" Text="Paused — chart and table are frozen, sampling continues" />
+                    </Border>
                 </Grid>
             </Border>
 
-            <!-- Table toolbar -->
-            <DockPanel Grid.Row="2" Margin="0,14,0,6">
+            <!-- Table toolbar: caption · window · columns -->
+            <DockPanel Grid.Row="3" Margin="0,20,0,10">
+                <Button DockPanel.Dock="Right" Classes="icon" Margin="10,0,0,0" ToolTip.Tip="Choose visible columns">
+                    <PathIcon Data="{StaticResource IconColumns}" />
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                            <StackPanel Spacing="6" MinWidth="180">
+                                <TextBlock Classes="muted" FontSize="11" Text="COLUMNS" Margin="0,0,0,4" />
+                                <CheckBox Content="PID" IsChecked="{Binding ShowPid}" />
+                                <CheckBox Content="Read" IsChecked="{Binding ShowRead}" />
+                                <CheckBox Content="Write" IsChecked="{Binding ShowWrite}" />
+                                <CheckBox Content="Requests" IsChecked="{Binding ShowRequests}" />
+                                <CheckBox Content="Share" IsChecked="{Binding ShowShare}" />
+                                <CheckBox Content="Top file" IsChecked="{Binding ShowTopFile}" />
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
                 <Border DockPanel.Dock="Right" Background="#1D222C" CornerRadius="8" Padding="3" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="2">
                         <Button Classes="seg" Classes.active="{Binding IsWindow5}" Content="5 s" Command="{Binding SelectWindowCommand}" CommandParameter="5" />
@@ -193,78 +300,118 @@
                         <Button Classes="seg" Classes.active="{Binding IsCumulative}" Content="&#x3A3; since start" Command="{Binding SelectWindowCommand}" CommandParameter="all" />
                     </StackPanel>
                 </Border>
-                <Border DockPanel.Dock="Right" Background="#1D222C" CornerRadius="8" Padding="3" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip.Tip="Order by request count (what usually saturates a disk) or by bytes">
-                    <StackPanel Orientation="Horizontal" Spacing="2">
-                        <TextBlock Classes="muted" FontSize="11" Text="Sort" VerticalAlignment="Center" Margin="6,0,4,0" />
-                        <Button Classes="seg" Classes.active="{Binding IsSortOps}" Content="Requests" Command="{Binding SelectSortCommand}" CommandParameter="ops" />
-                        <Button Classes="seg" Classes.active="{Binding IsSortBytes}" Content="Bytes" Command="{Binding SelectSortCommand}" CommandParameter="bytes" />
-                    </StackPanel>
-                </Border>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Which programs cause this?" FontSize="15" FontWeight="SemiBold" />
-                    <TextBlock Classes="muted" FontSize="12">
-                        <Run Text="Processes with I/O on this disk, " /><Run Text="{Binding WindowLabel}" /><Run Text=". Right-click a row or use the buttons to open it in Explorer." />
-                    </TextBlock>
-                </StackPanel>
+                <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                    <Run Text="Processes on this disk, " /><Run Text="{Binding WindowLabel}" /><Run Text=". Hover the bar for numbers, click a header to sort." />
+                </TextBlock>
             </DockPanel>
 
             <!-- Process table -->
-            <Border Grid.Row="3" Background="#1D222C" CornerRadius="10" ClipToBounds="True">
-                <Grid RowDefinitions="34,*">
-                    <Border Grid.Row="0" Background="#181C25" BorderBrush="#2A313D" BorderThickness="0,0,0,1">
-                        <Grid ColumnDefinitions="2*,60,90,90,80,80,130,3*,150">
-                            <TextBlock Grid.Column="0" Classes="head" Text="PROCESS" />
-                            <TextBlock Grid.Column="1" Classes="head num" Text="PID" />
-                            <TextBlock Grid.Column="2" Classes="head num" Text="READ" />
-                            <TextBlock Grid.Column="3" Classes="head num" Text="WRITE" />
-                            <TextBlock Grid.Column="4" Classes="head num" Text="REQUESTS" ToolTip.Tip="Number of I/O requests (reads + writes) in the window" />
-                            <TextBlock Grid.Column="5" Classes="head num" Text="TOTAL" />
-                            <TextBlock Grid.Column="6" Classes="head" Text="{Binding ShareHeader}" />
-                            <TextBlock Grid.Column="7" Classes="head" Text="TOP FILE" />
-                            <TextBlock Grid.Column="8" Classes="head" Text="ACTIONS" />
-                        </Grid>
-                    </Border>
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Processes}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ProcessRowViewModel">
-                                    <Border Classes="row" BorderBrush="#232933" BorderThickness="0,0,0,1">
-                                        <Border.ContextMenu>
-                                            <ContextMenu>
-                                                <MenuItem Header="Open in Explorer (executable)" Command="{Binding OpenInExplorerCommand}" />
-                                                <MenuItem Header="Open file location (top file)" Command="{Binding OpenFileLocationCommand}" />
-                                                <Separator />
-                                                <MenuItem Header="Copy file path" Command="{Binding CopyPathCommand}" />
-                                                <MenuItem Header="Copy executable path" Command="{Binding CopyImagePathCommand}" />
-                                            </ContextMenu>
-                                        </Border.ContextMenu>
-                                        <Grid ColumnDefinitions="2*,60,90,90,80,80,130,3*,150">
-                                            <TextBlock Grid.Column="0" Classes="cell" Text="{Binding ProcessName}" FontWeight="SemiBold" ToolTip.Tip="{Binding ImagePathTooltip}" />
-                                            <TextBlock Grid.Column="1" Classes="cell num muted" Text="{Binding Pid}" />
-                                            <TextBlock Grid.Column="2" Classes="cell num" Text="{Binding ReadText}" Foreground="#4CC38A" />
-                                            <TextBlock Grid.Column="3" Classes="cell num" Text="{Binding WriteText}" Foreground="#F29E4C" />
-                                            <TextBlock Grid.Column="4" Classes="cell num" Text="{Binding TotalOpsText}" FontWeight="SemiBold" ToolTip.Tip="{Binding OpsTooltip}" />
-                                            <TextBlock Grid.Column="5" Classes="cell num" Text="{Binding TotalText}" />
-                                            <Grid Grid.Column="6" ColumnDefinitions="*,40" Margin="8,0" VerticalAlignment="Center">
-                                                <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding Share}" Height="6" MinWidth="0" Foreground="#3B8EEA" Background="#2A313D" />
-                                                <TextBlock Grid.Column="1" Classes="num muted" FontSize="11" Text="{Binding ShareText}" VerticalAlignment="Center" />
-                                            </Grid>
-                                            <TextBlock Grid.Column="7" Classes="cell muted" Text="{Binding TopFileText}" ToolTip.Tip="{Binding TopFileTooltip}" />
-                                            <StackPanel Grid.Column="8" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0">
-                                                <Button Classes="mini" Content="Exe" Command="{Binding OpenInExplorerCommand}" ToolTip.Tip="Open the executable in Explorer" />
-                                                <Button Classes="mini" Content="File" Command="{Binding OpenFileLocationCommand}" ToolTip.Tip="Open the top file's folder in Explorer" />
-                                                <Button Classes="mini" Content="Copy" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the top file path" />
+            <Border Grid.Row="4" Background="#1D222C" CornerRadius="12" ClipToBounds="True">
+                <Grid>
+                    <DataGrid x:Name="ProcessGrid" ItemsSource="{Binding Processes}" IsReadOnly="True" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Width="2*" MinWidth="200">
+                                <DataGridTemplateColumn.Header>
+                                    <Button Classes="colhead" Tag="Name"><TextBlock Text="PROCESS" /></Button>
+                                </DataGridTemplateColumn.Header>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                        <DockPanel VerticalAlignment="Center">
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" Margin="10,0,0,0">
+                                                <Button Classes="icon" Command="{Binding OpenInExplorerCommand}" ToolTip.Tip="Open the program's folder in Explorer">
+                                                    <PathIcon Data="{StaticResource IconFolder}" />
+                                                </Button>
+                                                <Button Classes="icon" Command="{Binding CopyImagePathCommand}" ToolTip.Tip="Copy the program's path">
+                                                    <PathIcon Data="{StaticResource IconShare}" />
+                                                </Button>
                                             </StackPanel>
+                                            <TextBlock Text="{Binding ProcessName}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ImagePathTooltip}" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="70">
+                                <DataGridTemplateColumn.Header>
+                                    <Button Classes="colhead num" Tag="Pid"><TextBlock Classes="num" Text="PID" /></Button>
+                                </DataGridTemplateColumn.Header>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                        <TextBlock Classes="num muted" Text="{Binding Pid}" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="95">
+                                <DataGridTemplateColumn.Header>
+                                    <Button Classes="colhead num" Tag="Read"><TextBlock Classes="num" Text="READ" /></Button>
+                                </DataGridTemplateColumn.Header>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                        <TextBlock Classes="num" Text="{Binding ReadText}" Foreground="#8EE3B4" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="95">
+                                <DataGridTemplateColumn.Header>
+                                    <Button Classes="colhead num" Tag="Write"><TextBlock Classes="num" Text="WRITE" /></Button>
+                                </DataGridTemplateColumn.Header>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                        <TextBlock Classes="num" Text="{Binding WriteText}" Foreground="#3FAF76" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="100">
+                                <DataGridTemplateColumn.Header>
+                                    <Button Classes="colhead num" Tag="Ops" ToolTip.Tip="I/O requests (reads + writes) in the window"><TextBlock Classes="num" Text="REQUESTS" /></Button>
+                                </DataGridTemplateColumn.Header>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                        <TextBlock Classes="num" Text="{Binding TotalOpsText}" FontWeight="SemiBold" VerticalAlignment="Center" ToolTip.Tip="{Binding OpsTooltip}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="1.2*" MinWidth="120">
+                                <DataGridTemplateColumn.Header>
+                                    <Button Classes="colhead" Tag="Ops" ToolTip.Tip="Share of all I/O requests in the window; hover a bar for the numbers"><TextBlock Text="SHARE" /></Button>
+                                </DataGridTemplateColumn.Header>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                        <Grid ColumnDefinitions="*,40" VerticalAlignment="Center" Background="Transparent" ToolTip.Tip="{Binding DetailTooltip}">
+                                            <ProgressBar Grid.Column="0" Minimum="0" Maximum="1" Value="{Binding Share}" Height="8" MinWidth="0" Foreground="#3B8EEA" Background="#2A313D" />
+                                            <TextBlock Grid.Column="1" Classes="num muted" FontSize="11" Text="{Binding ShareText}" VerticalAlignment="Center" />
                                         </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                    <StackPanel Grid.Row="1" IsVisible="{Binding !HasProcesses}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
-                        <TextBlock Text="{Binding EmptyStateText}" FontSize="15" HorizontalAlignment="Center" Classes="muted" />
-                        <TextBlock Text="The disk is idle. Attributed I/O appears here as soon as a program reads or writes." FontSize="12" HorizontalAlignment="Center" Classes="muted" />
-                    </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTemplateColumn Width="3.5*" MinWidth="240">
+                                <DataGridTemplateColumn.Header>
+                                    <Button Classes="colhead" Tag="TopFile"><TextBlock Text="TOP FILE" /></Button>
+                                </DataGridTemplateColumn.Header>
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate x:DataType="vm:ProcessRowViewModel">
+                                        <DockPanel VerticalAlignment="Center">
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" Margin="10,0,0,0">
+                                                <Button Classes="icon" Command="{Binding OpenFileLocationCommand}" ToolTip.Tip="Show this file in Explorer">
+                                                    <PathIcon Data="{StaticResource IconFolder}" />
+                                                </Button>
+                                                <Button Classes="icon" Command="{Binding CopyFilePathCommand}" ToolTip.Tip="Copy the file path">
+                                                    <PathIcon Data="{StaticResource IconShare}" />
+                                                </Button>
+                                            </StackPanel>
+                                            <TextBlock Classes="muted" Text="{Binding TopFileText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TopFileTooltip}" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock IsVisible="{Binding !HasProcesses}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" Text="{Binding EmptyStateText}" />
                 </Grid>
             </Border>
         </Grid>

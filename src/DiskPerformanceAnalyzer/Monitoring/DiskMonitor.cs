@@ -80,7 +80,16 @@ public sealed class DiskMonitor : IDiskMonitor
         // reports 0 on many NVMe drives, which would pin the chart at 100 %.
         var active = _processIo.DrainActivePercent();
         var disks = counters
-            .Select(d => d with { ActivePercent = active.GetValueOrDefault(d.DiskNumber, 0.0) })
+            .Select(d =>
+            {
+                var ops = drained.TryGetValue(d.DiskNumber, out var list) ? list : null;
+                return d with
+                {
+                    ActivePercent = active.GetValueOrDefault(d.DiskNumber, 0.0),
+                    ReadsPerSec = ops?.Sum(p => p.ReadOps) ?? 0,
+                    WritesPerSec = ops?.Sum(p => p.WriteOps) ?? 0,
+                };
+            })
             .ToList();
 
         var byDisk = new Dictionary<int, IReadOnlyList<ProcessIo>>(drained.Count);

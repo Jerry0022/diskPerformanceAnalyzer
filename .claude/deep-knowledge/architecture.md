@@ -14,6 +14,7 @@ out of scope.
 | Disk % active time | **ETW-derived**: union of all DiskIO in-flight intervals (`TimeStamp − ElapsedTimeMSec` … `TimeStamp`) per disk per second → `BusyTime.ActivePercent` | The PhysicalDisk `% Idle Time` counter reports 0 (and `% Disk Time` > 3000 %) on NVMe drives — verified 2026-09-17 on this machine — so the counter is NOT used for % active |
 | Read/write throughput per disk | `PhysicalDisk\Disk Read Bytes/sec`, `Disk Write Bytes/sec` | Secondary axis on the chart |
 | Queue length | `PhysicalDisk\Current Disk Queue Length` | Saturation indicator |
+| Requests per second (IOPS) per disk and per process | Count of ETW `DiskIORead`/`DiskIOWrite` events per (disk, PID) per second | Request count is often the real saturation signal: thousands of 4 KB reads load a disk long before MB/s look high. The table sorts by requests by default |
 | Per-process I/O attribution | ETW kernel session, `KernelTraceEventParser.Keywords.DiskIO \| FileIO \| DiskFileIO` via `Microsoft.Diagnostics.Tracing.TraceEvent` | `DiskIORead/Write` events carry `ProcessID`, `DiskNumber`, `TransferSize`, `FileName` — this is the root-cause link disk → process → file |
 
 ETW needs an elevated process (`SeSystemProfilePrivilege`). **Decision
@@ -30,9 +31,11 @@ attribution is the product, and IoCounters cannot provide it.
   (`DiskNumber`, `Name`, drive letters, `ActivePercent`, `ReadBytesPerSec`,
   `WriteBytesPerSec`, `QueueLength`) + per-disk `ProcessIo` buckets for that
   second (`Pid`, `ProcessName`, `ReadBytes`, `WriteBytes`, top file paths).
-- Ring buffer keeps 60 one-second snapshots. The process table aggregates a
-  **selectable window (1 s / 5 s / 60 s, default 5 s)** and can be toggled to
-  **cumulative since start**. Click-to-freeze on the chart pins one exact second.
+- Ring buffer keeps 300 one-second snapshots. The process table aggregates a
+  **selectable window (5 s / 1 min / 5 min, default 1 min)** and can be toggled
+  to **cumulative since start**; it sorts by **requests** (default) or bytes.
+  Click-to-freeze on the chart pins one exact second. Live is secondary —
+  the aggregated view is what identifies the culprit.
 
 ## Layers
 
@@ -62,6 +65,20 @@ src/DiskPerformanceAnalyzer/
 - Row actions: *Open in Explorer* (executable path and/or hottest file),
   *Copy path*.
 - Window selector 1 s / 5 s / 60 s + *cumulative* toggle above the table.
+
+## Minimal invasiveness (verified 2026-09-18)
+
+The monitor must not add to the load it measures:
+
+- ETW session is **real-time only** (`TraceEventSession` without `FileName`;
+  `IsRealTime` is asserted at start) — events are consumed in memory, no .etl
+  is written. Kernel buffers 16 MB, keywords `DiskIO | DiskFileIO` only.
+- Nothing is logged to disk (`LogToTrace()` has no file listener).
+- The status bar shows the app's own request count ("This app: 0 IOPS now,
+  N requests since start"); after start-up page-ins it stays at zero.
+- Measured: ETW pump ≈ 0.6 % of one core; UI ≈ 9 % (LiveCharts redraw at
+  1 Hz, redirection-surface rendering instead of the WinUI compositor).
+  Private bytes flat at ~200 MB over 3 min.
 
 ## Non-goals
 

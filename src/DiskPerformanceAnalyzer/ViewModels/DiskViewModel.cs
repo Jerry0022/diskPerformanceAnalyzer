@@ -17,6 +17,9 @@ public partial class DiskViewModel : ObservableObject
     [ObservableProperty] private double _readBytesPerSec;
     [ObservableProperty] private double _writeBytesPerSec;
     [ObservableProperty] private double _queueLength;
+    [ObservableProperty] private double _readsPerSec;
+    [ObservableProperty] private double _writesPerSec;
+    [ObservableProperty] private double _opsPerSec;
     [ObservableProperty] private string _name;
     [ObservableProperty] private string _driveLetters;
 
@@ -56,6 +59,8 @@ public partial class DiskViewModel : ObservableObject
     public string ReadRateText => Formatting.Rate(ReadBytesPerSec);
     public string WriteRateText => Formatting.Rate(WriteBytesPerSec);
     public string ThroughputText => $"R {ReadRateText}   W {WriteRateText}";
+    public string IopsText => Formatting.Iops(OpsPerSec);
+    public string IopsDetailText => $"{Formatting.Iops(ReadsPerSec)} read, {Formatting.Iops(WritesPerSec)} write, queue {QueueLength.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}";
 
     public static string DisplayName(int diskNumber, IReadOnlyList<string> driveLetters) =>
         driveLetters.Count == 0
@@ -68,6 +73,9 @@ public partial class DiskViewModel : ObservableObject
         ReadBytesPerSec = sample.ReadBytesPerSec;
         WriteBytesPerSec = sample.WriteBytesPerSec;
         QueueLength = sample.QueueLength;
+        ReadsPerSec = sample.ReadsPerSec;
+        WritesPerSec = sample.WritesPerSec;
+        OpsPerSec = sample.OpsPerSec;
         if (sample.DriveLetters.Count > 0)
         {
             DriveLetters = string.Join(" ", sample.DriveLetters);
@@ -84,5 +92,7 @@ public partial class DiskViewModel : ObservableObject
         OnPropertyChanged(nameof(ReadRateText));
         OnPropertyChanged(nameof(WriteRateText));
         OnPropertyChanged(nameof(ThroughputText));
+        OnPropertyChanged(nameof(IopsText));
+        OnPropertyChanged(nameof(IopsDetailText));
     }
 }

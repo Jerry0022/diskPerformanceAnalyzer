@@ -96,7 +96,7 @@ public class MainViewModelTests
         monitor.Emit(Snapshot(T0, chromeRead: 0, msmpengWrite: 0));
 
         Assert.False(vm.HasProcesses);
-        Assert.Equal("No disk activity in the last 5 s", vm.EmptyStateText);
+        Assert.Equal("No disk activity in the last 1 min", vm.EmptyStateText);
     }
 
     private static DiskSnapshot Snapshot(DateTimeOffset ts, long chromeRead, long msmpengWrite) =>

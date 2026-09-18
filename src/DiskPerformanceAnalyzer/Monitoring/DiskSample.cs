@@ -8,4 +8,9 @@ public sealed record DiskSample(
     double ActivePercent,
     double ReadBytesPerSec,
     double WriteBytesPerSec,
-    double QueueLength);
+    double QueueLength,
+    double ReadsPerSec = 0,
+    double WritesPerSec = 0)
+{
+    public double OpsPerSec => ReadsPerSec + WritesPerSec;
+}

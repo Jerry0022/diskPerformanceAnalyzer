@@ -1,11 +1,11 @@
 # diskPerformanceAnalyzer
 
-Windows disk *activity* monitor (Task-Manager-style): % active time per physical
-disk, live interactive chart, top I/O processes as root cause, "open in
+Windows disk *activity* monitor (Task-Manager-style): requests/s and throughput per physical
+disk, one filter driving chart + table, top I/O processes as root cause, "open in
 Explorer". Not capacity/storage analysis — never count gigabytes.
 
 ## Stack
-.NET 8 · Avalonia 12 (MVVM, CommunityToolkit.Mvvm) · xunit · ETW via
+.NET 8 · Avalonia 11.3 + DataGrid (MVVM, CommunityToolkit.Mvvm) · LiveCharts2 · xunit · ETW via
 Microsoft.Diagnostics.Tracing.TraceEvent · PerformanceCounter for throughput/queue; % active derived from ETW
 
 ## Commands

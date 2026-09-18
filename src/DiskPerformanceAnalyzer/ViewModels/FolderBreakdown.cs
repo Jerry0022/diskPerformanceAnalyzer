@@ -23,6 +23,7 @@ public static class FolderBreakdown
     public const int DefaultMaxRows = 7;
 
     private const string Root = "\\";
+    private const string UnixRoot = "/";
     private static readonly char[] Separators = ['\\', '/'];
 
     public static IReadOnlyList<FolderShare> Build(ProcessIo io, int maxRows = DefaultMaxRows)
@@ -121,7 +122,10 @@ public static class FolderBreakdown
         return node;
     }
 
-    /// <summary>Folder containing <paramref name="path"/>: <c>C:\a\b.txt</c> gives <c>C:\a</c>, <c>C:\b.txt</c> gives <c>C:\</c>.</summary>
+    /// <summary>
+    /// Folder containing <paramref name="path"/>: <c>C:\a\b.txt</c> gives <c>C:\a</c>, <c>C:\b.txt</c>
+    /// gives <c>C:\</c>, <c>/usr/lib/x.so</c> gives <c>/usr/lib</c>, <c>/vmlinuz</c> gives <c>/</c>.
+    /// </summary>
     internal static string Folder(string path)
     {
         var cut = path.LastIndexOfAny(Separators);
@@ -131,13 +135,13 @@ public static class FolderBreakdown
         }
 
         var folder = path[..cut];
-        return folder.Length == 0 ? Root : IsDrive(folder) ? folder + '\\' : folder;
+        return folder.Length == 0 ? RootOf(path) : IsDrive(folder) ? folder + '\\' : folder;
     }
 
     /// <summary>Parent folder, or null at a drive root or the bare root.</summary>
     internal static string? Parent(string folder)
     {
-        if (folder == Root || IsDriveRoot(folder))
+        if (folder == Root || folder == UnixRoot || IsDriveRoot(folder))
         {
             return null;
         }
@@ -149,8 +153,10 @@ public static class FolderBreakdown
         }
 
         var parent = folder[..cut];
-        return parent.Length == 0 ? Root : IsDrive(parent) ? parent + '\\' : parent;
+        return parent.Length == 0 ? RootOf(folder) : IsDrive(parent) ? parent + '\\' : parent;
     }
+
+    private static string RootOf(string path) => path.StartsWith('/') ? UnixRoot : Root;
 
     private static bool IsDrive(string s) => s.Length == 2 && s[1] == ':';
     private static bool IsDriveRoot(string s) => s.Length == 3 && s[1] == ':' && (s[2] == '\\' || s[2] == '/');

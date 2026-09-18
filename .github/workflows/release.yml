@@ -1,7 +1,8 @@
 name: Release
 
-# Pushing a tag like v1.2.3 builds a self-contained single-file exe for win-x64
-# and attaches it (plus a zip) to a GitHub Release with auto-generated notes.
+# Pushing a tag like v1.2.3 builds self-contained single-file binaries for win-x64 and
+# linux-x64 and attaches them (plus archives and checksums) to a GitHub Release with
+# auto-generated notes.
 on:
   push:
     tags: ["v*.*.*"]
@@ -10,12 +11,18 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # full history so release notes can diff against the previous tag
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -29,31 +36,68 @@ jobs:
       - name: Test
         run: dotnet test DiskPerformanceAnalyzer.sln -c Release
 
-      - name: Publish win-x64 (single file, self-contained)
+      - name: Publish ${{ matrix.rid }} (single file, self-contained)
         run: >
-          dotnet publish src/DiskPerformanceAnalyzer -c Release -r win-x64 --self-contained
+          dotnet publish src/DiskPerformanceAnalyzer -c Release -r ${{ matrix.rid }} --self-contained
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -p:Version=${{ steps.ver.outputs.version }}
           -o publish
 
-      - name: Package
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $v = "${{ steps.ver.outputs.version }}"
           New-Item -ItemType Directory dist | Out-Null
           Copy-Item publish/DiskPerformanceAnalyzer.exe "dist/DiskPerformanceAnalyzer-$v-win-x64.exe"
           Compress-Archive -Path publish/* -DestinationPath "dist/DiskPerformanceAnalyzer-$v-win-x64.zip"
-          Get-FileHash dist/* -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
-            Set-Content dist/SHA256SUMS.txt
           Get-ChildItem dist
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          v="${{ steps.ver.outputs.version }}"
+          mkdir dist
+          chmod +x publish/DiskPerformanceAnalyzer
+          sudo ./publish/DiskPerformanceAnalyzer --probe 2   # the data layer against the runner's kernel
+          cp publish/DiskPerformanceAnalyzer "dist/DiskPerformanceAnalyzer-$v-linux-x64"
+          tar -C publish -czf "dist/DiskPerformanceAnalyzer-$v-linux-x64.tar.gz" .
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so release notes can diff against the previous tag
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: >
-          gh release create "$GITHUB_REF_NAME" dist/*
-          --title "Disk Performance Analyzer $GITHUB_REF_NAME"
-          --generate-notes
-          --notes "Download **DiskPerformanceAnalyzer-${{ steps.ver.outputs.version }}-win-x64.exe**, run it (asks for admin — needed for the kernel I/O trace), done. No install, no .NET runtime required. Windows 10/11 x64."
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Disk Performance Analyzer $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "**Windows:** download \`DiskPerformanceAnalyzer-$v-win-x64.exe\`, run it (asks for admin — needed for the kernel I/O trace). **Linux:** download \`DiskPerformanceAnalyzer-$v-linux-x64\`, \`chmod +x\` it, run it (asks for root via pkexec — needed for tracefs; without root the disks are still shown, just without the process table). No install, no .NET runtime required. Windows 10/11 x64 · Linux x64 (glibc, X11/Wayland)."

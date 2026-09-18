@@ -5,14 +5,15 @@ using System.IO;
 namespace DiskPerformanceAnalyzer.Platform;
 
 /// <summary>
-/// Launches Windows Explorer to reveal or open files/directories. Never throws.
+/// Opens the system file manager at a path: Windows Explorer with the item selected, or the
+/// desktop's default file manager via <c>xdg-open</c> on Linux (which cannot select a file, so
+/// the containing folder is opened). Never throws.
 /// </summary>
 public static class ExplorerLauncher
 {
     /// <summary>
-    /// Reveals <paramref name="path"/> in Explorer with the item selected. Falls back to
-    /// opening the parent directory if the path itself does not exist, and is a no-op if
-    /// neither the path nor its parent exists.
+    /// Reveals <paramref name="path"/> in the file manager. Falls back to opening the parent
+    /// directory if the path itself does not exist, and is a no-op if neither exists.
     /// </summary>
     public static void Reveal(string path)
     {
@@ -25,14 +26,22 @@ public static class ExplorerLauncher
         {
             if (File.Exists(path) || Directory.Exists(path))
             {
-                Start("explorer.exe", BuildSelectArguments(path));
+                if (OperatingSystem.IsWindows())
+                {
+                    Start("explorer.exe", BuildSelectArguments(path));
+                }
+                else
+                {
+                    OpenFolder(Directory.Exists(path) ? path : Path.GetDirectoryName(path) ?? path);
+                }
+
                 return;
             }
 
             var parent = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
             {
-                Start("explorer.exe", BuildOpenArguments(parent));
+                OpenFolder(parent);
             }
         }
         catch
@@ -42,7 +51,7 @@ public static class ExplorerLauncher
     }
 
     /// <summary>
-    /// Opens <paramref name="path"/> (treated as a directory) in Explorer. No-op if it fails.
+    /// Opens <paramref name="path"/> (treated as a directory) in the file manager. No-op if it fails.
     /// </summary>
     public static void OpenFolder(string path)
     {
@@ -53,7 +62,14 @@ public static class ExplorerLauncher
 
         try
         {
-            Start("explorer.exe", BuildOpenArguments(path));
+            if (OperatingSystem.IsWindows())
+            {
+                Start("explorer.exe", BuildOpenArguments(path));
+            }
+            else
+            {
+                using var process = Process.Start(new ProcessStartInfo("xdg-open", [path]) { UseShellExecute = false });
+            }
         }
         catch
         {

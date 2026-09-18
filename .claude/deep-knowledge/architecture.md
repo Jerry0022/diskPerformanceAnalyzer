@@ -19,14 +19,41 @@ out of scope.
 
 ETW needs an elevated process (`SeSystemProfilePrivilege`). **Decision
 (2026-09-17): always elevated** — `app.manifest` sets `requireAdministrator`,
-exactly like Resource Monitor. There is no non-admin fallback: process→disk
-attribution is the product, and IoCounters cannot provide it.
+exactly like Resource Monitor. There is no non-admin fallback on Windows:
+process→disk attribution is the product, and IoCounters cannot provide it.
+
+## Data sources (Linux, added 2026-09-18, v0.3)
+
+| Metric | Source | Notes |
+|--------|--------|-------|
+| Disks | `/sys/block/*` whole devices (skip loop/ram/zram/fd/nbd); partitions via `<dev>/<part>/partition`; dm-*/md* resolved to their first slave | `LinuxBlockDevices`, refreshed every 10 s; index-stable per instance |
+| Mount points | `/proc/self/mountinfo` field 3 (`major:minor`) → field 5, octal-unescaped | Longest-prefix lookup maps a path to its disk; "drive letters" on the card are mount points |
+| % active, bytes/s, requests/s, queue | `/proc/diskstats` deltas: `io_ticks`, sectors×512, completed reads/writes, `in_flight` | `ProcDiskStatsSource` — the numbers iostat shows |
+| Per-process attribution | tracefs `events/block/block_rq_issue` read from `trace_pipe` in a private instance (`instances/diskPerformanceAnalyzer`) | `TracefsProcessIoSource`: line `comm-tid [cpu] … block_rq_issue: 8,2 WS 4096 () sector + n [comm]` → disk via device number, thread → process via `/proc/tid/status` Tgid (at record time — worker threads die fast), name via `/proc/pid/comm`. Root required; tracefs is mounted on demand |
+| Files per process | `/proc/pid/fd` targets on the same disk, no counts | The block layer does not know the file; eBPF would, but that is not worth the dependency |
+| Busy time from the trace | none — `DrainActivePercent()` is empty, `io_ticks` is used | `block_rq_complete` would allow it; not needed |
+
+Elevation on Linux: `Program.Main` relaunches itself through `pkexec env
+DISPLAY=… WAYLAND_DISPLAY=… XDG_RUNTIME_DIR=… <exe> --no-elevate`; exit code
+126/127 (declined / no agent) falls back to running unprivileged, where
+`DiskMonitor.Notice` explains the missing process table. `--probe [seconds]`
+runs the data layer headless (used by CI on the Ubuntu runner and for WSL).
+
+Namespaces: the tracepoint reports root-namespace PIDs. Inside WSL distros
+or containers they do not match `/proc`; the source detects this via its own
+reader thread's comm (`dpa-trace-read`) and then uses the trace's comm as the
+process name and lists no files.
 
 ## Contract between Monitoring and UI (decided 2026-09-17)
 
 - `IDiskMonitor` — `Start()` / `Dispose()`, raises `SnapshotReady(DiskSnapshot)`
   once per second on a background thread. The ViewModel marshals to the UI
-  thread via `Dispatcher.UIThread`. No Rx, no channels.
+  thread via `Dispatcher.UIThread`. No Rx, no channels. `Notice` (after
+  `Start`) says why process attribution is missing, or null.
+- `DiskMonitor(IDiskSampleSource, IProcessIoSource?)` — `Create()` picks
+  PerfCounter+ETW on Windows, `/proc/diskstats`+tracefs on Linux. With a
+  process source, per-disk bytes/requests come from the trace so chart and
+  table agree; without one the disk source's own numbers are used.
 - `DiskSnapshot` — timestamp + one `DiskSample` per physical disk
   (`DiskNumber`, `Name`, drive letters, `ActivePercent`, `ReadBytesPerSec`,
   `WriteBytesPerSec`, `QueueLength`) + per-disk `ProcessIo` buckets for that
@@ -43,14 +70,20 @@ attribution is the product, and IoCounters cannot provide it.
 src/DiskPerformanceAnalyzer/
 ├── Monitoring/           ← no Avalonia refs; unit-testable
 │   ├── IDiskMonitor / DiskSnapshot / DiskSample / ProcessIo
-│   ├── PerfCounterDiskSource   (% active, throughput, queue per disk)
-│   ├── EtwProcessIoSource      (per-process/per-disk bytes, top files)
-│   ├── DiskMonitor             (combines sources, 1 Hz snapshot event)
-│   └── SnapshotRingBuffer      (60 s, window + cumulative aggregation)
-├── Platform/             ← Win32 helpers, no Avalonia refs
-│   ├── ExplorerLauncher        (`explorer.exe /select,"<path>"`)
-│   ├── ProcessImagePath        (QueryFullProcessImageName)
-│   └── DiskDriveLetters        (disk number → drive letters)
+│   ├── IDiskSampleSource / IProcessIoSource  (platform seams)
+│   ├── PerfCounterDiskSource   (Windows: throughput, queue per disk)
+│   ├── EtwProcessIoSource      (Windows: per-process/per-disk bytes, requests, files, busy time)
+│   ├── Linux/LinuxBlockDevices (sysfs disks, partitions, dm/md, mount points)
+│   ├── Linux/ProcDiskStatsSource (Linux: % active, throughput, requests, queue)
+│   ├── Linux/TracefsProcessIoSource (Linux: block_rq_issue → process, open files)
+│   ├── DiskMonitor             (Create() = platform factory; combines sources, 1 Hz snapshot event)
+│   └── SnapshotRingBuffer      (300 s, window + cumulative aggregation)
+├── Platform/             ← OS helpers, no Avalonia refs
+│   ├── ExplorerLauncher        (Windows `explorer.exe /select,"<path>"`, Linux `xdg-open <folder>`)
+│   ├── ProcessImagePath        (QueryFullProcessImageName / `/proc/pid/exe`)
+│   ├── Elevation               (Administrators / root)
+│   └── DiskDriveLetters        (Windows: disk number → drive letters)
+├── Probe.cs              ← `--probe`: headless data-layer run (CI, SSH, WSL)
 ├── ViewModels/           ← CommunityToolkit.Mvvm; MainViewModel owns filter, sort, column toggles
 └── Views/                ← Avalonia AXAML; LiveCharts2 chart, Avalonia DataGrid (headers wired in code-behind)
 ```

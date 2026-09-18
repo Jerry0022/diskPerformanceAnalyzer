@@ -119,6 +119,7 @@ public class MainViewModelTests
     {
         public event Action<DiskSnapshot>? SnapshotReady;
         public bool Started { get; private set; }
+        public string? Notice => null;
         public void Start() => Started = true;
         public void Emit(DiskSnapshot snapshot) => SnapshotReady?.Invoke(snapshot);
         public void Dispose() { }

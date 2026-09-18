@@ -23,11 +23,12 @@ public partial class DiskViewModel : ObservableObject
     [ObservableProperty] private string _name;
     [ObservableProperty] private string _driveLetters;
 
-    public DiskViewModel(int diskNumber, IReadOnlyList<string> driveLetters)
+    public DiskViewModel(int diskNumber, IReadOnlyList<string> driveLetters, string? title = null)
     {
         DiskNumber = diskNumber;
+        Title = title ?? $"Disk {diskNumber}";
         _driveLetters = string.Join(" ", driveLetters);
-        _name = DisplayName(diskNumber, driveLetters);
+        _name = DisplayName(Title, driveLetters);
 
         SparkSeries =
         [
@@ -69,10 +70,12 @@ public partial class DiskViewModel : ObservableObject
         $"{Labels.Data}: {Formatting.Rate(ReadBytesPerSec + WriteBytesPerSec)}  ·  {Labels.Read} {ReadRateText}  {Labels.Write} {WriteRateText}\n" +
         $"Queue length {QueueText}";
 
-    public static string DisplayName(int diskNumber, IReadOnlyList<string> driveLetters) =>
-        driveLetters.Count == 0
-            ? $"Disk {diskNumber}"
-            : $"Disk {diskNumber} ({string.Join(" ", driveLetters)})";
+    /// <summary>"Disk 0" / "nvme0n1" — see <see cref="DiskSample.Title"/>.</summary>
+    public string Title { get; }
+
+    /// <summary>"Disk 0 (C: D:)" on Windows, "nvme0n1 (/ /home)" on Linux.</summary>
+    public static string DisplayName(string title, IReadOnlyList<string> driveLetters) =>
+        driveLetters.Count == 0 ? title : $"{title} ({string.Join(" ", driveLetters)})";
 
     public void Update(DiskSample sample)
     {
@@ -85,7 +88,7 @@ public partial class DiskViewModel : ObservableObject
         if (sample.DriveLetters.Count > 0)
         {
             DriveLetters = string.Join(" ", sample.DriveLetters);
-            Name = DisplayName(sample.DiskNumber, sample.DriveLetters);
+            Name = DisplayName(Title, sample.DriveLetters);
         }
 
         Sparkline.Add(OpsPerSec);

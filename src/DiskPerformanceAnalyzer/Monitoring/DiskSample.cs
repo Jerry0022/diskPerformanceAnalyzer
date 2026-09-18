@@ -10,7 +10,11 @@ public sealed record DiskSample(
     double WriteBytesPerSec,
     double QueueLength,
     double ReadsPerSec = 0,
-    double WritesPerSec = 0)
+    double WritesPerSec = 0,
+    string? DeviceName = null)
 {
+    /// <summary>Card title: the kernel device name on Linux ("nvme0n1"), "Disk N" on Windows.</summary>
+    public string Title => DeviceName ?? $"Disk {DiskNumber}";
+
     public double OpsPerSec => ReadsPerSec + WritesPerSec;
 }

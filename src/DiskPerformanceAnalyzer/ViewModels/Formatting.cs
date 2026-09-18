@@ -142,6 +142,8 @@ public static class Formatting
     /// folder and the file name. <c>C:\Users\Me\AppData\Local\Cache\f_0001</c> becomes
     /// <c>C:\Users\…\Cache\f_0001</c>. Paths with five segments or fewer are returned as-is.
     /// </summary>
+    private static readonly char[] PathSeparators = ['\\', '/'];
+
     public static string ShortPath(string? path)
     {
         if (string.IsNullOrEmpty(path))
@@ -149,13 +151,15 @@ public static class Formatting
             return "-";
         }
 
-        var parts = path.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+        var parts = path.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length <= 5)
         {
             return path;
         }
 
-        return string.Join('\\', [parts[0], parts[1], "\u2026", parts[^2], parts[^1]]);
+        var separator = path.Contains('/') && !path.Contains('\\') ? "/" : "\\";
+        var head = path.StartsWith('/') ? "/" + parts[0] : parts[0];
+        return string.Join(separator, [head, parts[1], "\u2026", parts[^2], parts[^1]]);
     }
 
     public static string Percent(double percent) =>

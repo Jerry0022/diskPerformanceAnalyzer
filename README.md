@@ -24,11 +24,15 @@ Every release ships a `SHA256SUMS.txt` so you can verify the download.
 - **Chart (60 s)**: read/write MB/s as filled areas, read/write requests/s as lines.
   Click to freeze a second; pause icon top-right.
 - **Process table**: who issued the requests in the selected window (5 s / 1 min / 5 min / since
-  start), share bar with details on hover, top file per process. Folder icon opens the
-  executable or file in Explorer, share icon copies the path. Hidden columns (PID, read, write,
-  requests) toggle via the column icon.
-- **One filter** for chart and table: type a process or path fragment, or select rows to isolate
-  them in the chart.
+  start). Two share bars per row — requests (blue) and data (green); the header chips pick the
+  sort key, hover shows all numbers. Folder icon opens the executable or file in Explorer, share
+  icon copies the path. Hidden columns (PID, read, write, requests) toggle via the column icon.
+- **Folder breakdown**: expand a row (▸) to see *where* a process is busy — its I/O rolled up
+  to the most specific folders that fit in seven lines, plus one line for unnamed I/O (paging,
+  NTFS metadata, cache flushes). Turns "System is busy" into "System is busy in that cache folder".
+- **One filter** for chart and table: type a process or path fragment, or click a row to isolate
+  it in the chart (click again to release).
+- Numbers never flicker: no decimals, two significant digits, tabular figures.
 
 The tool is minimally invasive: the ETW session is real-time only (no trace file), nothing is
 logged to disk, and the status bar shows the app's own I/O so you can confirm it stays at zero.

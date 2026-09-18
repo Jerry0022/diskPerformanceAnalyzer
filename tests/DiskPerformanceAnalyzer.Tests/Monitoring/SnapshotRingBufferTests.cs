@@ -112,6 +112,39 @@ public class SnapshotRingBufferTests
     }
 
     [Fact]
+    public void Files_accumulate_bytes_and_ops_and_rank_top_files_by_requests()
+    {
+        var buffer = new SnapshotRingBuffer();
+        buffer.Add(Snapshot(0, (0, new ProcessIo(10, "p", 0, 0, ["a"], 0, 0)
+        {
+            Files = [new FileIo("a", 100, 1), new FileIo("b", 10, 5), new FileIo(string.Empty, 1, 9)],
+        })));
+        buffer.Add(Snapshot(1, (0, new ProcessIo(10, "p", 0, 0, ["a"], 0, 0)
+        {
+            Files = [new FileIo("a", 100, 1), new FileIo(string.Empty, 1, 1)],
+        })));
+
+        var io = buffer.AggregateProcesses(0, 2).Single();
+
+        Assert.Equal(["b", "a"], io.TopFiles);
+        Assert.Equal(new FileIo(string.Empty, 2, 10), io.Files[0]);
+        Assert.Equal(new FileIo("b", 10, 5), io.Files[1]);
+        Assert.Equal(new FileIo("a", 200, 2), io.Files[2]);
+    }
+
+    [Fact]
+    public void AggregateEndingAt_takes_the_window_before_a_timestamp()
+    {
+        var buffer = new SnapshotRingBuffer();
+        buffer.Add(Snapshot(0, (0, Io(10, 1, 0))));
+        buffer.Add(Snapshot(1, (0, Io(10, 10, 0))));
+        buffer.Add(Snapshot(2, (0, Io(10, 100, 0))));
+
+        Assert.Equal(11, buffer.AggregateEndingAt(0, T0.AddSeconds(1), 5).Single().ReadBytes);
+        Assert.Equal(10, buffer.AggregateEndingAt(0, T0.AddSeconds(1), 1).Single().ReadBytes);
+    }
+
+    [Fact]
     public void At_returns_snapshot_covering_timestamp()
     {
         var buffer = new SnapshotRingBuffer();

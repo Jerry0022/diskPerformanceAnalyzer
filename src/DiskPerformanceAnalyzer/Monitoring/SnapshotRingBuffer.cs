@@ -10,6 +10,8 @@ public sealed class SnapshotRingBuffer
     public const int TopFilesPerProcess = 3;
     /// <summary>Upper bound of distinct file paths tracked per process before pruning.</summary>
     public const int MaxTrackedFilesPerProcess = 64;
+    /// <summary>How many of the hottest files survive a prune.</summary>
+    public const int KeptFilesPerProcess = 24;
 
     private readonly object _gate = new();
     private readonly DiskSnapshot[] _items;
@@ -109,6 +111,29 @@ public sealed class SnapshotRingBuffer
         return ToSortedList(perPid);
     }
 
+    /// <summary>
+    /// Per-process totals for one disk over the last <paramref name="windowSeconds"/> snapshots
+    /// not after <paramref name="end"/> (click-to-freeze).
+    /// </summary>
+    public IReadOnlyList<ProcessIo> AggregateEndingAt(int diskNumber, DateTimeOffset end, int windowSeconds)
+    {
+        var perPid = new Dictionary<int, Accumulator>();
+        foreach (var snapshot in All().Where(s => s.Timestamp <= end).TakeLast(windowSeconds))
+        {
+            if (!snapshot.ProcessIoByDisk.TryGetValue(diskNumber, out var processes))
+            {
+                continue;
+            }
+
+            foreach (var io in processes)
+            {
+                Accumulate(perPid, io);
+            }
+        }
+
+        return ToSortedList(perPid);
+    }
+
     /// <summary>Per-process totals for one disk since the buffer was created; not bounded by the capacity.</summary>
     public IReadOnlyList<ProcessIo> AggregateCumulative(int diskNumber)
     {
@@ -158,21 +183,32 @@ public sealed class SnapshotRingBuffer
         acc.WriteOps += io.WriteOps;
         acc.ProcessName = io.ProcessName;
 
-        // TopFiles carry no byte counts; rank by position (index 0 = hottest) weighted by the
-        // process's bytes in that second so merged lists reflect where the bytes went.
-        var weight = Math.Max(1, io.ReadBytes + io.WriteBytes);
-        for (var rank = 0; rank < io.TopFiles.Count; rank++)
+        if (io.Files.Count > 0)
         {
-            var file = io.TopFiles[rank];
-            var score = weight / (rank + 1);
-            acc.Files[file] = acc.Files.GetValueOrDefault(file) + score;
+            foreach (var file in io.Files)
+            {
+                var current = acc.Files.GetValueOrDefault(file.Path);
+                acc.Files[file.Path] = (current.Bytes + file.Bytes, current.Ops + file.Ops);
+            }
+        }
+        else
+        {
+            // Sources without per-file counts (tests, older snapshots): rank TopFiles by position
+            // weighted by the process's activity in that second.
+            var weight = Math.Max(1, io.TotalOps > 0 ? io.TotalOps : io.TotalBytes);
+            for (var rank = 0; rank < io.TopFiles.Count; rank++)
+            {
+                var current = acc.Files.GetValueOrDefault(io.TopFiles[rank]);
+                acc.Files[io.TopFiles[rank]] = (current.Bytes, current.Ops + weight / (rank + 1));
+            }
         }
 
         // Cumulative totals live for the whole run; a busy process (System, browsers) touches
-        // thousands of distinct files. Keep only the hottest entries so memory stays flat.
+        // thousands of distinct files. Keep only the hottest entries so memory stays flat; the
+        // unnamed entry always survives because it is usually the biggest for System.
         if (acc.Files.Count > MaxTrackedFilesPerProcess)
         {
-            foreach (var stale in acc.Files.OrderByDescending(f => f.Value).Skip(TopFilesPerProcess * 4).Select(f => f.Key).ToList())
+            foreach (var stale in acc.Files.Where(f => f.Key.Length > 0).OrderByDescending(f => f.Value.Ops).ThenByDescending(f => f.Value.Bytes).Skip(KeptFilesPerProcess).Select(f => f.Key).ToList())
             {
                 acc.Files.Remove(stale);
             }
@@ -184,12 +220,13 @@ public sealed class SnapshotRingBuffer
         var list = new List<ProcessIo>(perPid.Count);
         foreach (var (pid, acc) in perPid)
         {
-            var topFiles = acc.Files
-                .OrderByDescending(f => f.Value)
-                .Take(TopFilesPerProcess)
-                .Select(f => f.Key)
+            var files = acc.Files
+                .OrderByDescending(f => f.Value.Ops)
+                .ThenByDescending(f => f.Value.Bytes)
+                .Select(f => new FileIo(f.Key, f.Value.Bytes, f.Value.Ops))
                 .ToList();
-            list.Add(new ProcessIo(pid, acc.ProcessName, acc.Read, acc.Write, topFiles, acc.ReadOps, acc.WriteOps));
+            var topFiles = files.Where(f => !f.IsUnnamed).Take(TopFilesPerProcess).Select(f => f.Path).ToList();
+            list.Add(new ProcessIo(pid, acc.ProcessName, acc.Read, acc.Write, topFiles, acc.ReadOps, acc.WriteOps) { Files = files });
         }
 
         list.Sort((a, b) => b.TotalBytes.CompareTo(a.TotalBytes));
@@ -205,6 +242,6 @@ public sealed class SnapshotRingBuffer
         public long Write;
         public long ReadOps;
         public long WriteOps;
-        public Dictionary<string, long> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, (long Bytes, long Ops)> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

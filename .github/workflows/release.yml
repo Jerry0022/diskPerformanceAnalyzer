@@ -1,0 +1,59 @@
+name: Release
+
+# Pushing a tag like v1.2.3 builds a self-contained single-file exe for win-x64
+# and attaches it (plus a zip) to a GitHub Release with auto-generated notes.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so release notes can diff against the previous tag
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Derive version from tag
+        id: ver
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: dotnet test DiskPerformanceAnalyzer.sln -c Release
+
+      - name: Publish win-x64 (single file, self-contained)
+        run: >
+          dotnet publish src/DiskPerformanceAnalyzer -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ steps.ver.outputs.version }}
+          -o publish
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item publish/DiskPerformanceAnalyzer.exe "dist/DiskPerformanceAnalyzer-$v-win-x64.exe"
+          Compress-Archive -Path publish/* -DestinationPath "dist/DiskPerformanceAnalyzer-$v-win-x64.zip"
+          Get-FileHash dist/* -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content dist/SHA256SUMS.txt
+          Get-ChildItem dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --title "Disk Performance Analyzer $GITHUB_REF_NAME"
+          --generate-notes
+          --notes "Download **DiskPerformanceAnalyzer-${{ steps.ver.outputs.version }}-win-x64.exe**, run it (asks for admin — needed for the kernel I/O trace), done. No install, no .NET runtime required. Windows 10/11 x64."

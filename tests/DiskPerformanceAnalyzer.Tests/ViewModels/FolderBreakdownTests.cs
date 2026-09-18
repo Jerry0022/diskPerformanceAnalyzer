@@ -70,6 +70,24 @@ public class FolderBreakdownTests
     }
 
     [Fact]
+    public void UnixPathsRollUpToSlashRoot()
+    {
+        Assert.Equal("/usr/lib", FolderBreakdown.Folder("/usr/lib/x.so"));
+        Assert.Equal("/", FolderBreakdown.Folder("/vmlinuz"));
+        Assert.Equal("/", FolderBreakdown.Parent("/usr"));
+        Assert.Null(FolderBreakdown.Parent("/"));
+
+        var io = System(
+            new FileIo("/home/me/.cache/a", 0, 10),
+            new FileIo("/home/me/.cache/b", 0, 20),
+            new FileIo("/var/log/syslog", 0, 5));
+
+        var rows = FolderBreakdown.Build(io, maxRows: 2);
+
+        Assert.Equal(["/home/me/.cache", "/var/log"], rows.Select(r => r.Path).ToArray());
+    }
+
+    [Fact]
     public void EmptyFilesGiveNoRows()
     {
         Assert.Empty(FolderBreakdown.Build(new ProcessIo(1, "x", 0, 0, [])));

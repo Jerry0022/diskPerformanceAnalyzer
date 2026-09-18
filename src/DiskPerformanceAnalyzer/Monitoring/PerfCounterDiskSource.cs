@@ -9,7 +9,7 @@ namespace DiskPerformanceAnalyzer.Monitoring;
 /// Instances are re-enumerated periodically so hot-plugged disks appear.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class PerfCounterDiskSource : IDisposable
+public sealed class PerfCounterDiskSource : IDiskSampleSource
 {
     private const string Category = "PhysicalDisk";
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);

@@ -245,6 +245,9 @@
                     <TextBlock Classes="muted" FontSize="12" Text="Requests and data per physical disk" />
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0" Spacing="2">
+                    <Border IsVisible="{Binding HasNotice}" Background="#2A2410" BorderBrush="#5C4A14" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
+                        <TextBlock FontSize="11" Foreground="#E0B84A" TextWrapping="Wrap" Text="{Binding Notice}" />
+                    </Border>
                     <TextBlock Classes="muted" FontSize="11" Text="{Binding SelfLoadText}" ToolTip.Tip="The monitor's own disk footprint. The ETW session is real-time only (no trace file) and nothing is logged, so this should stay at zero." />
                     <TextBlock Classes="muted" FontSize="11" Text="{Binding StatusText}" />
                 </StackPanel>

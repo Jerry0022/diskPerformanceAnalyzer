@@ -4,15 +4,16 @@ using System.Security.Principal;
 namespace DiskPerformanceAnalyzer.Platform;
 
 /// <summary>
-/// Reports whether the current process is running with administrator privileges.
+/// Reports whether the current process has the privileges the kernel trace needs:
+/// Administrators on Windows (ETW kernel session), root on Linux (tracefs).
 /// </summary>
-[SupportedOSPlatform("windows")]
 public static class Elevation
 {
-    /// <summary>
-    /// Returns true if the current process token is a member of the built-in Administrators role.
-    /// </summary>
-    public static bool IsElevated()
+    public static bool IsElevated() =>
+        OperatingSystem.IsWindows() ? IsWindowsAdministrator() : Environment.IsPrivilegedProcess;
+
+    [SupportedOSPlatform("windows")]
+    private static bool IsWindowsAdministrator()
     {
         using var identity = WindowsIdentity.GetCurrent();
         var principal = new WindowsPrincipal(identity);

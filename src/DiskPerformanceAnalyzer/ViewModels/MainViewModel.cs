@@ -71,6 +71,14 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     [ObservableProperty]
     private string _selfLoadText = "This app: idle";
 
+    /// <summary>Why the process table is empty on this machine (Linux without root / tracefs), or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNotice))]
+    [NotifyPropertyChangedFor(nameof(EmptyStateText))]
+    private string? _notice;
+
+    public bool HasNotice => Notice is not null;
+
     /// <summary>Substring filter on process name or attributed file path; applies to chart and table.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FilterDescription), nameof(HasFilter))]
@@ -95,9 +103,8 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     [ObservableProperty] private bool _showShare = true;
     [ObservableProperty] private bool _showTopFile = true;
 
-    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public MainViewModel()
-        : this(Design.IsDesignMode ? new NullDiskMonitor() : new DiskMonitor(), null)
+        : this(Design.IsDesignMode ? new NullDiskMonitor() : DiskMonitor.Create(), null)
     {
         if (Design.IsDesignMode)
         {
@@ -267,7 +274,9 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
             ? $"{WindowText} ending {t.LocalDateTime:HH:mm:ss}"
             : $"last {WindowText}";
 
-    public string EmptyStateText => HasFilter
+    public string EmptyStateText => Notice is not null
+        ? "Process attribution is unavailable on this machine (see the note on the left)"
+        : HasFilter
         ? "No process matches the filter"
         : IsCumulative
             ? "No disk activity since start"
@@ -282,6 +291,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
 
         _started = true;
         _monitor.Start();
+        Notice = _monitor.Notice;
     }
 
     /// <summary>Pins the table to the second covering <paramref name="timestamp"/> (chart click).</summary>
@@ -415,7 +425,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
             var disk = Disks.FirstOrDefault(d => d.DiskNumber == sample.DiskNumber);
             if (disk is null)
             {
-                disk = new DiskViewModel(sample.DiskNumber, sample.DriveLetters);
+                disk = new DiskViewModel(sample.DiskNumber, sample.DriveLetters, sample.Title);
                 var index = 0;
                 while (index < Disks.Count && Disks[index].DiskNumber < sample.DiskNumber)
                 {
@@ -433,7 +443,10 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
 
         if (SelectedDisk is null && Disks.Count > 0)
         {
-            SelectedDisk = Disks.FirstOrDefault(d => d.DriveLetters.Contains("C:", StringComparison.OrdinalIgnoreCase)) ?? Disks[0];
+            // Start on the system disk: C: on Windows, the disk holding "/" on Linux.
+            SelectedDisk = Disks.FirstOrDefault(d => d.DriveLetters.Contains("C:", StringComparison.OrdinalIgnoreCase))
+                ?? Disks.FirstOrDefault(d => d.DriveLetters == "/" || d.DriveLetters.StartsWith("/ ", StringComparison.Ordinal))
+                ?? Disks[0];
             return; // OnSelectedDiskChanged already rebuilt chart + table from the buffer
         }
 
@@ -757,6 +770,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     private sealed class NullDiskMonitor : IDiskMonitor
     {
         public event Action<DiskSnapshot>? SnapshotReady { add { } remove { } }
+        public string? Notice => null;
         public void Start() { }
         public void Dispose() { }
     }

@@ -15,7 +15,6 @@ public partial class App : Application
         AvaloniaXamlLoader.Load(this);
     }
 
-    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public override void OnFrameworkInitializationCompleted()
     {
         LiveCharts.Configure(config => config.AddDarkTheme());

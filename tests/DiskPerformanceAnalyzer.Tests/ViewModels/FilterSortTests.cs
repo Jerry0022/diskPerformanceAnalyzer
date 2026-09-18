@@ -98,6 +98,7 @@ public class FilterSortTests
     private sealed class FakeMonitor : IDiskMonitor
     {
         public event Action<DiskSnapshot>? SnapshotReady;
+        public string? Notice => null;
         public void Start() { }
         public void Emit(DiskSnapshot snapshot) => SnapshotReady?.Invoke(snapshot);
         public void Dispose() { }

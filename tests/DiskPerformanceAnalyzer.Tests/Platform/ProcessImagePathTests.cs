@@ -13,9 +13,17 @@ public class ProcessImagePathTests
 
         Assert.True(found);
         Assert.NotNull(path);
-        Assert.True(
-            path!.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase));
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.True(
+                path!.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            Assert.True(System.IO.Path.IsPathRooted(path));
+            Assert.True(System.IO.File.Exists(path));
+        }
     }
 
     [Fact]

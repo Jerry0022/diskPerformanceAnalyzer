@@ -13,7 +13,7 @@ namespace DiskPerformanceAnalyzer.Monitoring;
 /// for the current second; <see cref="DrainSecond"/> swaps the buckets atomically.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class EtwProcessIoSource : IDisposable
+public sealed class EtwProcessIoSource : IProcessIoSource
 {
     public const string SessionName = "DiskPerformanceAnalyzer-Kernel";
     public const int TopFilesPerProcess = SnapshotRingBuffer.TopFilesPerProcess;

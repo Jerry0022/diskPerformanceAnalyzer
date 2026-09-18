@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
@@ -7,11 +8,10 @@ using System.Text;
 namespace DiskPerformanceAnalyzer.Platform;
 
 /// <summary>
-/// Resolves the full executable image path for a process id, including elevated processes
-/// that <see cref="System.Diagnostics.Process.MainModule"/> cannot read from a non-elevated
-/// caller.
+/// Resolves the full executable image path for a process id. Windows: QueryFullProcessImageName,
+/// which also works for elevated processes that <see cref="System.Diagnostics.Process.MainModule"/>
+/// cannot read. Linux: the /proc/pid/exe link (kernel threads have none).
 /// </summary>
-[SupportedOSPlatform("windows")]
 public static class ProcessImagePath
 {
     private const uint ProcessQueryLimitedInformation = 0x1000;
@@ -20,11 +20,12 @@ public static class ProcessImagePath
 
     /// <summary>
     /// Attempts to resolve the full image path of the process identified by <paramref name="pid"/>.
-    /// Returns false for pid 0 (System Idle Process) and pid 4 (System), and for any failure.
+    /// Returns false for pid 0, for the Windows System process (pid 4), for Linux kernel threads
+    /// and for any failure.
     /// </summary>
     public static bool TryGet(int pid, out string? path)
     {
-        if (pid == 0 || pid == 4)
+        if (pid <= 0 || (pid == 4 && OperatingSystem.IsWindows()))
         {
             path = null;
             return false;
@@ -36,13 +37,33 @@ public static class ProcessImagePath
             return cached != null;
         }
 
-        var resolved = Resolve(pid);
+        var resolved = OperatingSystem.IsWindows() ? ResolveWindows(pid) : ResolveProc(pid);
         Cache[pid] = resolved;
         path = resolved;
         return resolved != null;
     }
 
-    private static string? Resolve(int pid)
+    private static string? ResolveProc(int pid)
+    {
+        try
+        {
+            var target = new FileInfo($"/proc/{pid}/exe").LinkTarget;
+            if (target is null)
+            {
+                return null;
+            }
+
+            const string deleted = " (deleted)";
+            return target.EndsWith(deleted, StringComparison.Ordinal) ? target[..^deleted.Length] : target;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static string? ResolveWindows(int pid)
     {
         IntPtr handle = IntPtr.Zero;
         try

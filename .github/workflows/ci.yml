@@ -7,7 +7,15 @@ on:
 
 jobs:
   build-test:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +34,11 @@ jobs:
 
       - name: Publish smoke test (single-file, self-contained)
         run: >
-          dotnet publish src/DiskPerformanceAnalyzer -c Release -r win-x64 --self-contained
+          dotnet publish src/DiskPerformanceAnalyzer -c Release -r ${{ matrix.rid }} --self-contained
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
+
+      # The Linux data layer against a real kernel: /proc/diskstats + tracefs need root.
+      - name: Probe (Linux, root)
+        if: runner.os == 'Linux'
+        run: sudo ./publish/DiskPerformanceAnalyzer --probe 3

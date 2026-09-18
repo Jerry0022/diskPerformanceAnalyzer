@@ -6,6 +6,15 @@ namespace DiskPerformanceAnalyzer.Tests.ViewModels;
 public class FormattingTests
 {
     [Theory]
+    [InlineData(@"C:\Users\Me\AppData\Local\Cache\f_0001", @"C:\Users\…\Cache\f_0001")]
+    [InlineData(@"C:\Windows\System32\x.dll", @"C:\Windows\System32\x.dll")]
+    [InlineData("/home/me/.cache/mozilla/firefox/abc/cache2/entries/x", "/home/me/…/entries/x")]
+    [InlineData("/usr/lib/x.so", "/usr/lib/x.so")]
+    [InlineData("", "-")]
+    public void ShortPath_KeepsTheSeparatorOfThePath(string path, string expected) =>
+        Assert.Equal(expected, Formatting.ShortPath(path));
+
+    [Theory]
     [InlineData(0, "0 B")]
     [InlineData(999, "999 B")]
     [InlineData(1_000, "1,000 B")]

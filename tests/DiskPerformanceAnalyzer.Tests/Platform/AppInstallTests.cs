@@ -37,11 +37,14 @@ public class AppInstallTests
     }
 
     [Theory]
-    [InlineData(@"C:\Users\Me\Downloads\DiskPerformanceAnalyzer-0.3.0-win-x64.exe", true)]
-    [InlineData(@"C:\src\bin\Debug\net8.0\DiskPerformanceAnalyzer.exe", true)]
-    [InlineData(@"C:\Program Files\dotnet\dotnet.exe", false)]
-    public void IsAppExecutable_AcceptsOnlyTheAppsOwnHost(string path, bool expected)
+    [InlineData("DiskPerformanceAnalyzer-0.3.0-win-x64.exe", true)] // renamed release download
+    [InlineData("DiskPerformanceAnalyzer.exe", true)]                // build output
+    [InlineData("dotnet.exe", false)]                                // host when started as "dotnet X.dll"
+    public void IsAppExecutable_AcceptsOnlyTheAppsOwnHost(string fileName, bool expected)
     {
+        // Path.Combine keeps the test valid on Linux CI, where '\' is not a separator.
+        var path = Path.Combine(Path.GetTempPath(), "some folder", fileName);
+
         Assert.Equal(expected, AppInstall.IsAppExecutable(path));
     }
 

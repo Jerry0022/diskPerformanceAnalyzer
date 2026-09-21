@@ -25,6 +25,7 @@
         <StreamGeometry x:Key="IconPlay">M6 3.5v13l10-6.5-10-6.5Z</StreamGeometry>
         <StreamGeometry x:Key="IconSearch">M8.5 3a5.5 5.5 0 0 1 4.4 8.8l4.2 4.2-1.1 1.1-4.2-4.2A5.5 5.5 0 1 1 8.5 3Zm0 1.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z</StreamGeometry>
         <StreamGeometry x:Key="IconChevronRight">M7.3 4.3a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4-1.4L11.6 10 7.3 5.7a1 1 0 0 1 0-1.4Z</StreamGeometry>
+        <StreamGeometry x:Key="IconSettings">M15.85 8.65L18.12 8.86L18.12 11.14L15.85 11.35L15.09 13.18L16.55 14.93L14.93 16.55L13.18 15.09L11.35 15.85L11.14 18.12L8.86 18.12L8.65 15.85L6.82 15.09L5.07 16.55L3.45 14.93L4.91 13.18L4.15 11.35L1.88 11.14L1.88 8.86L4.15 8.65L4.91 6.82L3.45 5.07L5.07 3.45L6.82 4.91L8.65 4.15L8.86 1.88L11.14 1.88L11.35 4.15L13.18 4.91L14.93 3.45L16.55 5.07L15.09 6.82Z M10 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z</StreamGeometry>
         <StreamGeometry x:Key="IconChevronDown">M4.3 7.3a1 1 0 0 1 1.4 0L10 11.6l4.3-4.3a1 1 0 1 1 1.4 1.4l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 0 1 0-1.4Z</StreamGeometry>
     </Window.Resources>
 
@@ -308,6 +309,38 @@
                             <Button Command="{Binding GoLiveCommand}" Content="Live" Classes="mini" Background="#F2B94C" Foreground="#1B1F27" FontWeight="SemiBold" />
                         </StackPanel>
                     </Border>
+                    <!-- Settings: install + Start menu + start with Windows -->
+                    <Button Name="SettingsButton" Classes="icon" ToolTip.Tip="Settings — install, Start menu, start with Windows">
+                        <PathIcon Data="{StaticResource IconSettings}" />
+                        <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedRight">
+                                <StackPanel Spacing="6" Width="320" DataContext="{Binding Integration}" x:DataType="vm:IntegrationViewModel">
+                                    <TextBlock Classes="muted" FontSize="11" Text="SETTINGS" Margin="0,0,0,4" />
+                                    <TextBlock IsVisible="{Binding !IsSupported}" FontSize="12" TextWrapping="Wrap"
+                                               Text="Install, Start menu and autostart are Windows features; nothing to set up here." />
+                                    <StackPanel IsVisible="{Binding IsSupported}" Spacing="6">
+                                        <TextBlock FontSize="12" TextWrapping="Wrap" Text="{Binding InstallStateText}" />
+                                        <Border IsVisible="{Binding HasProfileWarning}" Background="#2A2410" BorderBrush="#5C4A14" BorderThickness="1" CornerRadius="8" Padding="10,8">
+                                            <TextBlock FontSize="11" Foreground="#E0B84A" TextWrapping="Wrap" Text="{Binding ProfileWarning}" />
+                                        </Border>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="mini" Content="{Binding InstallButtonText}" Command="{Binding InstallCommand}" IsVisible="{Binding ShowInstallButton}"
+                                                    ToolTip.Tip="{Binding InstallDirectory}" />
+                                            <Button Classes="mini" Content="Uninstall" Command="{Binding UninstallCommand}" IsVisible="{Binding IsInstalled}"
+                                                    ToolTip.Tip="Removes the program folder, the Start menu entry and the logon task" />
+                                            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Width="60" Height="4" VerticalAlignment="Center" Foreground="#3B8EEA" />
+                                        </StackPanel>
+                                        <CheckBox Content="Show in Start menu" IsChecked="{Binding StartMenuShortcut}" IsEnabled="{Binding CanToggleShortcut}"
+                                                  ToolTip.Tip="Shortcut in your Start menu's program list" />
+                                        <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}" IsEnabled="{Binding CanToggleTask}"
+                                                  ToolTip.Tip="Elevated logon task in Task Scheduler — starts without a UAC prompt when you sign in" />
+                                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap" Text="{Binding StatusText}" IsVisible="{Binding HasStatus}" />
+                                        <TextBlock Foreground="#E0B84A" FontSize="11" TextWrapping="Wrap" Text="{Binding ErrorText}" IsVisible="{Binding HasError}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
                 <StackPanel Spacing="4">
                     <TextBlock Classes="h1" Text="{Binding SelectedDiskTitle}" />

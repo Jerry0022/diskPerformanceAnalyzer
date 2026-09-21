@@ -20,6 +20,11 @@ public partial class MainWindow : Window
         ProcessGrid.LoadingRow += OnLoadingRow;
         ProcessGrid.AddHandler(PointerPressedEvent, OnGridPointerPressed, RoutingStrategies.Tunnel);
         ProcessGrid.AddHandler(PointerReleasedEvent, OnGridPointerReleased, RoutingStrategies.Bubble);
+        if (SettingsButton.Flyout is { } settings)
+        {
+            // Re-read shortcut/task state each time: the user may have changed it outside the app.
+            settings.Opened += (_, _) => _ = _vm?.Integration.RefreshAsync();
+        }
         DataContextChanged += (_, _) =>
         {
             if (_vm is not null)

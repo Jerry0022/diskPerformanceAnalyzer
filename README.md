@@ -21,7 +21,9 @@ so you can verify the download.
 **Windows 10/11 x64** — `DiskPerformanceAnalyzer-<version>-win-x64.exe`, run it. The app asks
 for administrator rights on start: it reads disk I/O from an ETW kernel trace, the same source
 Resource Monitor uses, and that requires elevation. SmartScreen may warn because the binary is
-not code-signed — "More info → Run anyway".
+not code-signed — "More info → Run anyway". Optional: the settings gear (top right) can
+install the exe to your user profile, add it to the Start menu and start it with Windows
+(an elevated logon task, so no UAC prompt at sign-in).
 
 **Linux x64** (glibc, X11 or Wayland) — `DiskPerformanceAnalyzer-<version>-linux-x64`:
 

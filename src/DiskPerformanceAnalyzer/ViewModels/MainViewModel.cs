@@ -229,6 +229,9 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     /// <summary>Set by the view; writes text to the system clipboard.</summary>
     public Func<string, Task>? ClipboardWriter { get; set; }
 
+    /// <summary>Settings flyout: install, Start menu shortcut, start with Windows.</summary>
+    public IntegrationViewModel Integration { get; } = new();
+
     public SnapshotRingBuffer Buffer => _buffer;
     public IReadOnlySet<int> SelectedPids => _selectedPids;
 

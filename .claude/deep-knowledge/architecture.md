@@ -82,7 +82,12 @@ src/DiskPerformanceAnalyzer/
 │   ├── ExplorerLauncher        (Windows `explorer.exe /select,"<path>"`, Linux `xdg-open <folder>`)
 │   ├── ProcessImagePath        (QueryFullProcessImageName / `/proc/pid/exe`)
 │   ├── Elevation               (Administrators / root)
-│   └── DiskDriveLetters        (Windows: disk number → drive letters)
+│   ├── DiskDriveLetters        (Windows: disk number → drive letters)
+│   ├── AppInstall              (Windows: copy to %LocalAppData%\Programs, clean reinstall, deferred uninstall)
+│   ├── StartMenuShortcut       (Windows: .lnk via IShellLink, on an STA thread)
+│   ├── StartupTask             (Windows: schtasks /XML logon task, RunLevel HighestAvailable, no time limit)
+│   ├── SingleInstance          (Windows: named mutex + activate event — one copy per session)
+│   └── InteractiveUser         (Windows: process user ≠ session user → over-the-shoulder UAC)
 ├── Probe.cs              ← `--probe`: headless data-layer run (CI, SSH, WSL)
 ├── ViewModels/           ← CommunityToolkit.Mvvm; MainViewModel owns filter, sort, column toggles
 └── Views/                ← Avalonia AXAML; LiveCharts2 chart, Avalonia DataGrid (headers wired in code-behind)
@@ -134,6 +139,19 @@ The monitor must not add to the load it measures:
 - Measured: ETW pump ≈ 0.6 % of one core; UI ≈ 9 % (LiveCharts redraw at
   1 Hz, redirection-surface rendering instead of the WinUI compositor).
   Private bytes flat at ~200 MB over 3 min.
+
+## Windows integration (added 2026-09-21, v0.4)
+
+The settings gear (header, top right) installs the program to a fixed per-user
+folder and, once installed, offers "Show in Start menu" and "Start with
+Windows". Autostart is a Task Scheduler logon task rather than a Run key: the
+app carries `requireAdministrator`, and UAC silently drops Run-key entries that
+need elevation. The task runs with `HighestAvailable` and `ExecutionTimeLimit`
+`PT0S` (the 72 h default would kill a monitor that stays open). Every toggle
+runs off the UI thread and re-reads the system state afterwards, so a failed
+change snaps the checkbox back and shows the reason. `SingleInstance` keeps one
+copy per session — a second start would stop the first copy's ETW session by
+name (`StopStaleSession`) — and hands over to the running window instead.
 
 ## Non-goals
 

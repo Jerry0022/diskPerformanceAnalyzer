@@ -33,8 +33,33 @@ sealed class Program
             }
         }
 
-        return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args.Where(a => a != NoElevateFlag).ToArray());
+        // A second copy (Start menu click while the logon task already runs the app) would stop
+        // the first copy's ETW session; hand over to the running window instead.
+        if (OperatingSystem.IsWindows())
+        {
+            Instance = Platform.SingleInstance.TryAcquire();
+            if (Instance is null)
+            {
+                return 0;
+            }
+        }
+
+        try
+        {
+            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args.Where(a => a != NoElevateFlag).ToArray());
+        }
+        finally
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                Instance?.Dispose();
+            }
+        }
     }
+
+    /// <summary>The single-instance claim (Windows only); App wires its activation request to the main window.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static Platform.SingleInstance? Instance { get; private set; }
 
     /// <summary>
     /// Runs this executable again under pkexec with the display variables passed through, and

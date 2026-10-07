@@ -32,6 +32,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     private static readonly SKColor ReadOpsColor = new(0x9C, 0xC8, 0xFF);
     private static readonly SKColor WriteOpsColor = new(0x2F, 0x6F, 0xC7);
     private static readonly SKColor Blue = new(0x3B, 0x8E, 0xEA);
+    private static readonly SKColor RangeColor = new(0xF2, 0xB9, 0x4C);
 
     private readonly IDiskMonitor _monitor;
     private readonly SnapshotRingBuffer _buffer = new();
@@ -47,16 +48,22 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     private DiskViewModel? _selectedDisk;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WindowLabel), nameof(EmptyStateText), nameof(IsWindow5), nameof(IsWindow60), nameof(IsWindow300))]
+    [NotifyPropertyChangedFor(nameof(WindowLabel), nameof(EmptyStateText), nameof(IsWindow5), nameof(IsWindow60), nameof(IsWindow300), nameof(IsCumulativeActive))]
     private int _windowSeconds = 60;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WindowLabel), nameof(EmptyStateText), nameof(IsWindow5), nameof(IsWindow60), nameof(IsWindow300))]
+    [NotifyPropertyChangedFor(nameof(WindowLabel), nameof(EmptyStateText), nameof(IsWindow5), nameof(IsWindow60), nameof(IsWindow300), nameof(IsCumulativeActive))]
     private bool _isCumulative;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFrozen), nameof(FrozenText), nameof(WindowLabel), nameof(EmptyStateText))]
     private DateTimeOffset? _frozenAt;
+
+    /// <summary>Range dragged on the chart (first and last snapshot, inclusive); pins the table and drives the legend averages.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRange), nameof(IsFrozen), nameof(FrozenText), nameof(WindowLabel), nameof(EmptyStateText),
+        nameof(IsWindow5), nameof(IsWindow60), nameof(IsWindow300), nameof(IsCumulativeActive))]
+    private (DateTimeOffset Start, DateTimeOffset End)? _range;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PauseButtonText))]
@@ -120,12 +127,34 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         _marshal = marshal ?? DispatchToUi;
         _monitor.SnapshotReady += OnSnapshotReady;
 
+        var readData = Area(Labels.ReadData, ReadValues, ReadBytesColor, p => Labels.Read + " " + Formatting.Rate(p.Model?.Value ?? 0));
+        var writeData = Area(Labels.WriteData, WriteValues, WriteBytesColor, p => Labels.Write + " " + Formatting.Rate(p.Model?.Value ?? 0));
+        var readOps = Line(Labels.ReadRequests, ReadOpsValues, ReadOpsColor, p => Labels.Read + " " + Formatting.Iops(p.Model?.Value ?? 0));
+        var writeOps = Line(Labels.WriteRequests, WriteOpsValues, WriteOpsColor, p => Labels.Write + " " + Formatting.Iops(p.Model?.Value ?? 0));
+
+        // The chart's own legend is hidden; these chips replace it so a click can hide a series.
+        Legend =
+        [
+            new ChartLegendItem(readData, Labels.ReadData, ReadBytesColor, isArea: true),
+            new ChartLegendItem(writeData, Labels.WriteData, WriteBytesColor, isArea: true),
+            new ChartLegendItem(readOps, Labels.ReadRequests, ReadOpsColor, isArea: false),
+            new ChartLegendItem(writeOps, Labels.WriteRequests, WriteOpsColor, isArea: false),
+        ];
+
+        RangeSection = new RectangularSection
+        {
+            IsVisible = false,
+            Fill = new SolidColorPaint(RangeColor.WithAlpha(0x2E)),
+            Stroke = new SolidColorPaint(RangeColor.WithAlpha(0xB0), 1f),
+        };
+        Sections = [RangeSection];
+
         Series =
         [
-            Area(Labels.ReadData, ReadValues, ReadBytesColor, p => Labels.Read + " " + Formatting.Rate(p.Model?.Value ?? 0)),
-            Area(Labels.WriteData, WriteValues, WriteBytesColor, p => Labels.Write + " " + Formatting.Rate(p.Model?.Value ?? 0)),
-            Line(Labels.ReadRequests, ReadOpsValues, ReadOpsColor, p => Labels.Read + " " + Formatting.Iops(p.Model?.Value ?? 0)),
-            Line(Labels.WriteRequests, WriteOpsValues, WriteOpsColor, p => Labels.Write + " " + Formatting.Iops(p.Model?.Value ?? 0)),
+            readData,
+            writeData,
+            readOps,
+            writeOps,
             new LineSeries<DateTimePoint>
             {
                 Name = "Frozen",
@@ -223,6 +252,9 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     public ObservableCollection<DateTimePoint> FrozenMarker { get; } = new();
 
     public ISeries[] Series { get; }
+    public ChartLegendItem[] Legend { get; }
+    public RectangularSection[] Sections { get; }
+    private RectangularSection RangeSection { get; }
     public Axis[] XAxes { get; }
     public Axis[] YAxes { get; }
 
@@ -237,13 +269,19 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
 
     public bool HasSelection => SelectedDisk is not null;
     public string SelectedDiskTitle => SelectedDisk?.Name ?? "No disk selected";
-    public bool IsFrozen => FrozenAt is not null;
-    public string FrozenText => FrozenAt is { } t ? $"Frozen at {t.LocalDateTime:HH:mm:ss}" : string.Empty;
+    public bool HasRange => Range is not null;
+    public bool IsFrozen => FrozenAt is not null || HasRange;
+
+    public string FrozenText => Range is { } r
+        ? $"Ø {r.Start.LocalDateTime:HH:mm:ss} – {r.End.LocalDateTime:HH:mm:ss} · {RangeSeconds(r)} s"
+        : FrozenAt is { } t ? $"Frozen at {t.LocalDateTime:HH:mm:ss}" : string.Empty;
     public string PauseButtonText => IsPaused ? "Resume" : "Pause";
 
-    public bool IsWindow5 => !IsCumulative && WindowSeconds == 5;
-    public bool IsWindow60 => !IsCumulative && WindowSeconds == 60;
-    public bool IsWindow300 => !IsCumulative && WindowSeconds == 300;
+    // A chart range replaces the window, so no window button is lit while one is selected.
+    public bool IsWindow5 => !HasRange && !IsCumulative && WindowSeconds == 5;
+    public bool IsWindow60 => !HasRange && !IsCumulative && WindowSeconds == 60;
+    public bool IsWindow300 => !HasRange && !IsCumulative && WindowSeconds == 300;
+    public bool IsCumulativeActive => !HasRange && IsCumulative;
     /// <summary>Which share bar is primary: data when sorted by a byte column, requests otherwise.</summary>
     public ProcessSort ShareMetric => SortBy is ProcessSort.Bytes or ProcessSort.Read or ProcessSort.Write ? ProcessSort.Bytes : ProcessSort.Ops;
 
@@ -271,7 +309,9 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
 
     private string WindowText => WindowSeconds >= 60 ? $"{WindowSeconds / 60} min" : $"{WindowSeconds} s";
 
-    public string WindowLabel => IsCumulative
+    public string WindowLabel => Range is { } r
+        ? $"{r.Start.LocalDateTime:HH:mm:ss} – {r.End.LocalDateTime:HH:mm:ss} ({RangeSeconds(r)} s)"
+        : IsCumulative
         ? "since start"
         : FrozenAt is { } t
             ? $"{WindowText} ending {t.LocalDateTime:HH:mm:ss}"
@@ -281,6 +321,8 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         ? "Process attribution is unavailable on this machine (see the note on the left)"
         : HasFilter
         ? "No process matches the filter"
+        : HasRange
+            ? "No disk activity in the selected range"
         : IsCumulative
             ? "No disk activity since start"
             : $"No disk activity in the last {WindowText}";
@@ -303,9 +345,45 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         var snapshot = _buffer.At(timestamp) ?? Nearest(timestamp);
         if (snapshot is not null)
         {
+            Range = null;
             FrozenAt = snapshot.Timestamp;
         }
     }
+
+    /// <summary>
+    /// Selects the snapshots between two chart positions (drag): the table sums them and the
+    /// legend shows each series' average per second. A drag over fewer than two samples is a
+    /// click on the second in its middle instead.
+    /// </summary>
+    public void SelectRange(DateTimeOffset from, DateTimeOffset to)
+    {
+        var (start, end) = from <= to ? (from, to) : (to, from);
+        var snapshots = _buffer.Between(start, end);
+        if (snapshots.Count < 2)
+        {
+            FreezeAt(start + (end - start) / 2);
+            UpdateRangeSection();
+            return;
+        }
+
+        FrozenAt = null;
+        Range = (snapshots[0].Timestamp, snapshots[^1].Timestamp);
+    }
+
+    /// <summary>Live feedback while dragging; <see cref="SelectRange"/> commits it.</summary>
+    public void PreviewRange(DateTimeOffset from, DateTimeOffset to)
+    {
+        var (start, end) = from <= to ? (from, to) : (to, from);
+        RangeSection.Xi = start.LocalDateTime.Ticks;
+        RangeSection.Xj = end.LocalDateTime.Ticks;
+        RangeSection.IsVisible = true;
+    }
+
+    /// <summary>A drag that was cancelled: show the committed range again (or none).</summary>
+    public void CancelRangePreview() => UpdateRangeSection();
+
+    private static int RangeSeconds((DateTimeOffset Start, DateTimeOffset End) range) =>
+        (int)Math.Round((range.End - range.Start).TotalSeconds) + 1;
 
     /// <summary>Called by the view when the table selection changes; selected rows narrow the chart.</summary>
     public void SetSelectedProcesses(IEnumerable<ProcessRowViewModel> rows)
@@ -337,7 +415,11 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     }
 
     [RelayCommand]
-    private void GoLive() => FrozenAt = null;
+    private void GoLive()
+    {
+        Range = null;
+        FrozenAt = null;
+    }
 
     [RelayCommand]
     private void ClearFilter()
@@ -369,6 +451,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     [RelayCommand]
     private void SelectWindow(string mode)
     {
+        Range = null;
         if (mode == "all")
         {
             IsCumulative = true;
@@ -407,6 +490,13 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
     partial void OnFrozenAtChanged(DateTimeOffset? value)
     {
         UpdateFrozenMarker();
+        RefreshProcesses();
+    }
+
+    partial void OnRangeChanged((DateTimeOffset Start, DateTimeOffset End)? value)
+    {
+        UpdateRangeSection();
+        UpdateRangeAverages();
         RefreshProcesses();
     }
 
@@ -463,7 +553,7 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         UpdateDataAxisUnit();
         UpdateXLimits(snapshot.Timestamp);
 
-        if (FrozenAt is null)
+        if (!IsFrozen)
         {
             RefreshProcesses();
         }
@@ -607,6 +697,55 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         }
 
         UpdateFrozenMarker();
+        UpdateRangeAverages();
+    }
+
+    private void UpdateRangeSection()
+    {
+        if (Range is { } r)
+        {
+            RangeSection.Xi = r.Start.LocalDateTime.Ticks;
+            RangeSection.Xj = r.End.LocalDateTime.Ticks;
+            RangeSection.IsVisible = true;
+        }
+        else
+        {
+            RangeSection.IsVisible = false;
+        }
+    }
+
+    /// <summary>
+    /// Average per second of every chart series over the selected range, with the chart's filter.
+    /// Computed from the buffer, so it stays right after the range scrolls out of the chart.
+    /// </summary>
+    private void UpdateRangeAverages()
+    {
+        if (Range is not { } r || SelectedDisk is null)
+        {
+            foreach (var item in Legend)
+            {
+                item.AverageText = null;
+            }
+
+            return;
+        }
+
+        var snapshots = _buffer.Between(r.Start, r.End);
+        double read = 0, write = 0, readOps = 0, writeOps = 0;
+        foreach (var snapshot in snapshots)
+        {
+            var sum = Sum(snapshot);
+            read += sum.Read;
+            write += sum.Write;
+            readOps += sum.ReadOps;
+            writeOps += sum.WriteOps;
+        }
+
+        var n = Math.Max(1, snapshots.Count);
+        Legend[0].AverageText = "Ø " + Formatting.Rate(read / n);
+        Legend[1].AverageText = "Ø " + Formatting.Rate(write / n);
+        Legend[2].AverageText = "Ø " + Formatting.Iops(readOps / n);
+        Legend[3].AverageText = "Ø " + Formatting.Iops(writeOps / n);
     }
 
     private void UpdateFrozenMarker()
@@ -632,7 +771,9 @@ public partial class MainViewModel : ObservableObject, IProcessRowHost, IDisposa
         }
 
         var disk = SelectedDisk.DiskNumber;
-        IReadOnlyList<ProcessIo> rows = IsCumulative
+        IReadOnlyList<ProcessIo> rows = Range is { } range
+            ? _buffer.AggregateBetween(disk, range.Start, range.End)
+            : IsCumulative
             ? _buffer.AggregateCumulative(disk)
             : FrozenAt is { } frozen
                 ? _buffer.AggregateEndingAt(disk, frozen, WindowSeconds)

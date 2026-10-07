@@ -61,7 +61,8 @@ process name and lists no files.
 - Ring buffer keeps 300 one-second snapshots. The process table aggregates a
   **selectable window (5 s / 1 min / 5 min, default 1 min)** and can be toggled
   to **cumulative since start**; it sorts by **requests** (default) or bytes.
-  Click-to-freeze on the chart pins one exact second. Live is secondary —
+  Click-to-freeze on the chart pins one exact second; dragging pins a range
+  (`SnapshotRingBuffer.AggregateBetween`) and the legend shows per-series averages. Live is secondary —
   the aggregated view is what identifies the culprit.
 
 ## Layers
@@ -110,7 +111,9 @@ src/DiskPerformanceAnalyzer/
   attributed file path. Clicking a row isolates that process in the chart;
   clicking the single selected row again (or Escape / "Clear filter") releases.
 - Chart (60 s): data as filled areas (left axis), requests/s as lines (right
-  axis). Click freezes a second; a grey pause icon sits in the top-right.
+  axis). Click freezes a second, drag selects a range (amber `RectangularSection`);
+  the chart legend is our own `ChartLegendItem` chips (click toggles the series,
+  Ø average while a range is set); a grey pause icon sits in the top-right.
 - Table (Avalonia DataGrid): PROCESS (chevron → folder breakdown, name, folder
   and share icons), SHARE — **two bars per row**, requests (blue) and data
   (green), the header chips `REQUESTS` / `DATA` choose the sort key and the

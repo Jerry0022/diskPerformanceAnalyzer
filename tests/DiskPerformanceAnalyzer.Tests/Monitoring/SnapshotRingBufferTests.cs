@@ -145,6 +145,19 @@ public class SnapshotRingBufferTests
     }
 
     [Fact]
+    public void AggregateBetween_sums_both_ends_inclusive()
+    {
+        var buffer = new SnapshotRingBuffer();
+        buffer.Add(Snapshot(0, (0, Io(10, 1, 0))));
+        buffer.Add(Snapshot(1, (0, Io(10, 10, 0))));
+        buffer.Add(Snapshot(2, (0, Io(10, 100, 0))));
+        buffer.Add(Snapshot(3, (0, Io(10, 1000, 0))));
+
+        Assert.Equal(110, buffer.AggregateBetween(0, T0.AddSeconds(1), T0.AddSeconds(2)).Single().ReadBytes);
+        Assert.Equal(2, buffer.Between(T0.AddSeconds(0.5), T0.AddSeconds(2.5)).Count);
+    }
+
+    [Fact]
     public void At_returns_snapshot_covering_timestamp()
     {
         var buffer = new SnapshotRingBuffer();

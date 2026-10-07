@@ -73,6 +73,66 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void Range_PinsTableAndShowsAveragesInLegend_GoLiveReleases()
+    {
+        var monitor = new FakeMonitor();
+        using var vm = new MainViewModel(monitor, a => a());
+        monitor.Emit(Snapshot(T0, chromeRead: 1_000, msmpengWrite: 0));
+        monitor.Emit(Snapshot(T0.AddSeconds(1), chromeRead: 3_000, msmpengWrite: 0));
+        monitor.Emit(Snapshot(T0.AddSeconds(2), chromeRead: 0, msmpengWrite: 4_000));
+        monitor.Emit(Snapshot(T0.AddSeconds(3), chromeRead: 0, msmpengWrite: 90_000));
+
+        // Dragged right to left, between sample positions: snaps to the seconds 0..2.
+        vm.SelectRange(T0.AddSeconds(2.4), T0.AddSeconds(-0.3));
+
+        Assert.True(vm.HasRange);
+        Assert.True(vm.IsFrozen);
+        Assert.Equal((T0, T0.AddSeconds(2)), vm.Range);
+        Assert.False(vm.IsWindow60);
+        Assert.Equal(4_000, vm.Processes.Single(p => p.ProcessName == "chrome").TotalBytes);
+        Assert.Equal(4_000, vm.Processes.Single(p => p.ProcessName == "MsMpEng").TotalBytes);
+        Assert.Equal("Ø " + Formatting.Rate(4_000 / 3.0), vm.Legend[0].AverageText);
+        Assert.Equal("Ø " + Formatting.Rate(4_000 / 3.0), vm.Legend[1].AverageText);
+        Assert.True(vm.Sections[0].IsVisible);
+
+        monitor.Emit(Snapshot(T0.AddSeconds(4), chromeRead: 1_000_000, msmpengWrite: 0));
+        Assert.Equal(4_000, vm.Processes.Single(p => p.ProcessName == "chrome").TotalBytes); // still pinned
+
+        vm.GoLiveCommand.Execute(null);
+        Assert.False(vm.IsFrozen);
+        Assert.Null(vm.Legend[0].AverageText);
+        Assert.False(vm.Sections[0].IsVisible);
+        Assert.True(vm.IsWindow60);
+    }
+
+    [Fact]
+    public void Range_OverOneSample_FreezesThatSecond()
+    {
+        var monitor = new FakeMonitor();
+        using var vm = new MainViewModel(monitor, a => a());
+        monitor.Emit(Snapshot(T0, chromeRead: 1_000, msmpengWrite: 0));
+        monitor.Emit(Snapshot(T0.AddSeconds(1), chromeRead: 3_000, msmpengWrite: 0));
+
+        vm.SelectRange(T0.AddSeconds(0.8), T0.AddSeconds(1.3));
+
+        Assert.False(vm.HasRange);
+        Assert.Equal(T0.AddSeconds(1), vm.FrozenAt);
+    }
+
+    [Fact]
+    public void LegendToggle_HidesItsSeries()
+    {
+        using var vm = new MainViewModel(new FakeMonitor(), a => a());
+
+        vm.Legend[0].IsVisible = false;
+
+        Assert.False(vm.Series[0].IsVisible);
+        Assert.True(vm.Series[1].IsVisible);
+        vm.Legend[0].IsVisible = true;
+        Assert.True(vm.Series[0].IsVisible);
+    }
+
+    [Fact]
     public void Cumulative_IgnoresWindowAndSumsSinceStart()
     {
         var monitor = new FakeMonitor();

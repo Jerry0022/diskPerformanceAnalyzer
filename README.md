@@ -47,7 +47,9 @@ handy over SSH.
 
 - **Per disk**: current IOPS, read/write request split, throughput, 60 s sparkline.
 - **Chart (60 s)**: read/write MB/s as filled areas, read/write requests/s as lines.
-  Click to freeze a second; pause icon top-right.
+  Click to freeze a second, drag to select a range: the legend then shows each series
+  averaged over it (Ø) and the table sums that range. Click a legend entry to hide or show
+  its series; pause icon top-right; Esc or the amber Live button returns to live.
 - **Process table**: who issued the requests in the selected window (5 s / 1 min / 5 min / since
   start). Two share bars per row — requests (blue) and data (green); the header chips pick the
   sort key, hover shows all numbers. Folder icon opens the executable or file in Explorer, share

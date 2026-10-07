@@ -15,7 +15,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Chart.PointerPressed += OnChartPointerPressed;
+        Chart.AddHandler(PointerPressedEvent, OnChartPointerPressed, RoutingStrategies.Bubble, handledEventsToo: true);
+        Chart.AddHandler(PointerMovedEvent, OnChartPointerMoved, RoutingStrategies.Bubble, handledEventsToo: true);
+        Chart.AddHandler(PointerReleasedEvent, OnChartPointerReleased, RoutingStrategies.Bubble, handledEventsToo: true);
+        Chart.AddHandler(PointerCaptureLostEvent, OnChartCaptureLost, RoutingStrategies.Bubble, handledEventsToo: true);
         ProcessGrid.SelectionChanged += OnGridSelectionChanged;
         ProcessGrid.LoadingRow += OnLoadingRow;
         ProcessGrid.AddHandler(PointerPressedEvent, OnGridPointerPressed, RoutingStrategies.Tunnel);
@@ -279,9 +282,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Escape && _vm is { IsFrozen: true })
+        {
+            _vm.GoLiveCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         base.OnKeyDown(e);
     }
 
+    /// <summary>Pointer travel (px) below which a press-release on the chart is a click, not a drag.</summary>
+    private const double DragThreshold = 4;
+
+    private Point? _chartPressPoint;
+    private DateTimeOffset _chartPressTime;
+    private bool _chartDragging;
+
+    /// <summary>Click freezes one second; dragging selects a range whose averages the legend shows.</summary>
     private void OnChartPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (_vm is null || !e.GetCurrentPoint(Chart).Properties.IsLeftButtonPressed)
@@ -290,13 +308,85 @@ public partial class MainWindow : Window
         }
 
         var p = e.GetPosition(Chart);
-        var data = Chart.ScalePixelsToData(new LvcPointD(p.X, p.Y));
-        if (double.IsNaN(data.X) || data.X <= 0 || data.X > DateTime.MaxValue.Ticks)
+        if (ChartTime(p) is not { } time)
         {
             return;
         }
 
-        var clicked = new DateTime((long)data.X, DateTimeKind.Local);
-        _vm.FreezeAt(new DateTimeOffset(clicked));
+        _chartPressPoint = p;
+        _chartPressTime = time;
+        _chartDragging = false;
+        e.Pointer.Capture(Chart);
+    }
+
+    private void OnChartPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_vm is null || _chartPressPoint is not { } start)
+        {
+            return;
+        }
+
+        var p = e.GetPosition(Chart);
+        if (!_chartDragging && Math.Abs(p.X - start.X) < DragThreshold)
+        {
+            return;
+        }
+
+        _chartDragging = true;
+        if (ChartTime(ClampToChart(p)) is { } time)
+        {
+            _vm.PreviewRange(_chartPressTime, time);
+        }
+    }
+
+    private void OnChartPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_vm is null || _chartPressPoint is null)
+        {
+            return;
+        }
+
+        _chartPressPoint = null;
+        e.Pointer.Capture(null);
+        if (!_chartDragging)
+        {
+            _vm.FreezeAt(_chartPressTime);
+            return;
+        }
+
+        _chartDragging = false;
+        if (ChartTime(ClampToChart(e.GetPosition(Chart))) is { } end)
+        {
+            _vm.SelectRange(_chartPressTime, end);
+        }
+        else
+        {
+            _vm.CancelRangePreview();
+        }
+    }
+
+    private void OnChartCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (_chartPressPoint is null)
+        {
+            return;
+        }
+
+        _chartPressPoint = null;
+        _chartDragging = false;
+        _vm?.CancelRangePreview();
+    }
+
+    private Point ClampToChart(Point p) => new(Math.Clamp(p.X, 0, Chart.Bounds.Width), p.Y);
+
+    private DateTimeOffset? ChartTime(Point p)
+    {
+        var data = Chart.ScalePixelsToData(new LvcPointD(p.X, p.Y));
+        if (double.IsNaN(data.X) || data.X <= 0 || data.X > DateTime.MaxValue.Ticks)
+        {
+            return null;
+        }
+
+        return new DateTimeOffset(new DateTime((long)data.X, DateTimeKind.Local));
     }
 }

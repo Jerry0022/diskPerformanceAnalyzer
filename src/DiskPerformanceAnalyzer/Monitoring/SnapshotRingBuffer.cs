@@ -92,33 +92,28 @@ public sealed class SnapshotRingBuffer
     public IReadOnlyList<DiskSnapshot> All() => Window(Capacity);
 
     /// <summary>Per-process totals for one disk over the last <paramref name="windowSeconds"/> seconds, sorted by Read+Write descending.</summary>
-    public IReadOnlyList<ProcessIo> AggregateProcesses(int diskNumber, int windowSeconds)
-    {
-        var perPid = new Dictionary<int, Accumulator>();
-        foreach (var snapshot in Window(windowSeconds))
-        {
-            if (!snapshot.ProcessIoByDisk.TryGetValue(diskNumber, out var processes))
-            {
-                continue;
-            }
-
-            foreach (var io in processes)
-            {
-                Accumulate(perPid, io);
-            }
-        }
-
-        return ToSortedList(perPid);
-    }
+    public IReadOnlyList<ProcessIo> AggregateProcesses(int diskNumber, int windowSeconds) =>
+        Aggregate(diskNumber, Window(windowSeconds));
 
     /// <summary>
     /// Per-process totals for one disk over the last <paramref name="windowSeconds"/> snapshots
     /// not after <paramref name="end"/> (click-to-freeze).
     /// </summary>
-    public IReadOnlyList<ProcessIo> AggregateEndingAt(int diskNumber, DateTimeOffset end, int windowSeconds)
+    public IReadOnlyList<ProcessIo> AggregateEndingAt(int diskNumber, DateTimeOffset end, int windowSeconds) =>
+        Aggregate(diskNumber, All().Where(s => s.Timestamp <= end).TakeLast(windowSeconds));
+
+    /// <summary>Per-process totals for one disk over the snapshots from <paramref name="start"/> to <paramref name="end"/>, both inclusive (chart range).</summary>
+    public IReadOnlyList<ProcessIo> AggregateBetween(int diskNumber, DateTimeOffset start, DateTimeOffset end) =>
+        Aggregate(diskNumber, Between(start, end));
+
+    /// <summary>Snapshots from <paramref name="start"/> to <paramref name="end"/>, both inclusive, oldest first.</summary>
+    public IReadOnlyList<DiskSnapshot> Between(DateTimeOffset start, DateTimeOffset end) =>
+        All().Where(s => s.Timestamp >= start && s.Timestamp <= end).ToList();
+
+    private static IReadOnlyList<ProcessIo> Aggregate(int diskNumber, IEnumerable<DiskSnapshot> snapshots)
     {
         var perPid = new Dictionary<int, Accumulator>();
-        foreach (var snapshot in All().Where(s => s.Timestamp <= end).TakeLast(windowSeconds))
+        foreach (var snapshot in snapshots)
         {
             if (!snapshot.ProcessIoByDisk.TryGetValue(diskNumber, out var processes))
             {

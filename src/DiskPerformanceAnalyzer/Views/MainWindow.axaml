@@ -158,6 +158,61 @@
         <Style Selector="Button.colhead.chip.active:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="Transparent" />
         </Style>
+        <!-- Frozen / range pill: amber, with the Live button flush at its right end. -->
+        <Style Selector="Button.live">
+            <Setter Property="Padding" Value="10,0,12,0" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="#F2B94C" />
+            <Setter Property="Foreground" Value="#1B1F27" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="Button.live:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#FFD27A" />
+            <Setter Property="TextElement.Foreground" Value="#1B1F27" />
+        </Style>
+        <Style Selector="Button.live:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#D9A23E" />
+            <Setter Property="TextElement.Foreground" Value="#1B1F27" />
+        </Style>
+        <Style Selector="Button.live PathIcon">
+            <Setter Property="Width" Value="9" />
+            <Setter Property="Height" Value="9" />
+            <Setter Property="Foreground" Value="#1B1F27" />
+        </Style>
+        <!-- Chart legend: one chip per series; click toggles the series. -->
+        <Style Selector="ToggleButton.legend">
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#B7BEC9" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="ToggleButton.legend:checked /template/ ContentPresenter, ToggleButton.legend:unchecked /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="TextElement.Foreground" Value="#B7BEC9" />
+        </Style>
+        <Style Selector="ToggleButton.legend:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2A313D" />
+            <Setter Property="TextElement.Foreground" Value="#E6EAF0" />
+        </Style>
+        <Style Selector="ToggleButton.legend:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#323A48" />
+        </Style>
+        <Style Selector="ToggleButton.legend:unchecked">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="ToggleButton.legend:unchecked TextBlock.label">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+        </Style>
         <Style Selector="ProgressBar.share">
             <Setter Property="Height" Value="6" />
             <Setter Property="MinWidth" Value="0" />
@@ -302,11 +357,16 @@
             <!-- Title + frozen pill -->
             <DockPanel Grid.Row="0" Margin="0,0,0,16">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Border IsVisible="{Binding IsFrozen}" Background="#3A2F14" BorderBrush="#F2B94C" BorderThickness="1" CornerRadius="14" Padding="12,4">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Text="&#x23F8;" VerticalAlignment="Center" Foreground="#F2B94C" />
-                            <TextBlock Text="{Binding FrozenText}" VerticalAlignment="Center" Foreground="#F2B94C" FontWeight="SemiBold" />
-                            <Button Command="{Binding GoLiveCommand}" Content="Live" Classes="mini" Background="#F2B94C" Foreground="#1B1F27" FontWeight="SemiBold" />
+                    <Border IsVisible="{Binding IsFrozen}" Background="#3A2F14" BorderBrush="#F2B94C" BorderThickness="1" CornerRadius="16" Padding="12,3,3,3" Height="32">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="{StaticResource IconPause}" Width="11" Height="11" Foreground="#F2B94C" VerticalAlignment="Center" />
+                            <TextBlock Classes="tnum" Text="{Binding FrozenText}" VerticalAlignment="Center" Foreground="#F2B94C" FontWeight="SemiBold" FontSize="12" Margin="0,0,4,0" />
+                            <Button Classes="live" Command="{Binding GoLiveCommand}" ToolTip.Tip="Back to live (Esc)">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <PathIcon Data="{StaticResource IconPlay}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Live" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Border>
                     <!-- Settings: install + Start menu + start with Windows -->
@@ -345,7 +405,7 @@
                 <StackPanel Spacing="4">
                     <TextBlock Classes="h1" Text="{Binding SelectedDiskTitle}" />
                     <TextBlock Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis">
-                        <Run Text="Showing " /><Run Text="{Binding FilterDescription}" FontWeight="SemiBold" Foreground="#B7BEC9" /><Run Text=". Type to filter, click a row to isolate it (click again to release), click the chart to freeze a second." />
+                        <Run Text="Showing " /><Run Text="{Binding FilterDescription}" FontWeight="SemiBold" Foreground="#B7BEC9" /><Run Text=". Type to filter, click a row to isolate it (click again to release), click the chart to freeze a second or drag to average a range." />
                     </TextBlock>
                 </StackPanel>
             </DockPanel>
@@ -362,31 +422,55 @@
 
             <!-- Chart: data as areas (left axis), requests as lines (right axis) -->
             <Border Grid.Row="2" Background="#1D222C" CornerRadius="12" Padding="12" MinHeight="180">
-                <Grid>
-                    <lvc:CartesianChart x:Name="Chart"
+                <Grid RowDefinitions="Auto,*">
+                    <!-- Legend chips (click hides a series) · pause -->
+                    <DockPanel Grid.Row="0" Margin="0,0,0,4">
+                        <Button DockPanel.Dock="Right" Classes="icon chartctl" Command="{Binding TogglePauseCommand}" ToolTip.Tip="{Binding PauseButtonText}">
+                            <Panel>
+                                <PathIcon Data="{StaticResource IconPause}" IsVisible="{Binding !IsPaused}" />
+                                <PathIcon Data="{StaticResource IconPlay}" IsVisible="{Binding IsPaused}" />
+                            </Panel>
+                        </Button>
+                        <Border DockPanel.Dock="Right" IsVisible="{Binding IsPaused}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                Background="#2A313D" CornerRadius="10" Padding="10,2">
+                            <TextBlock Classes="muted" FontSize="11" Text="Paused — chart and table are frozen, sampling continues" />
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Legend}" HorizontalAlignment="Center">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ChartLegendItem">
+                                    <ToggleButton Classes="legend" IsChecked="{Binding IsVisible}" ToolTip.Tip="{Binding Tooltip}" Margin="0,0,2,0">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Panel Width="14" Height="10" VerticalAlignment="Center">
+                                                <Border IsVisible="{Binding IsArea}" Background="{Binding Fill}" BorderBrush="{Binding Stroke}" BorderThickness="0,1.5,0,0" CornerRadius="2" />
+                                                <Border IsVisible="{Binding IsLine}" Background="{Binding Stroke}" Height="2" CornerRadius="1" VerticalAlignment="Center" />
+                                            </Panel>
+                                            <TextBlock Classes="label" Text="{Binding Label}" VerticalAlignment="Center" />
+                                            <TextBlock Classes="tnum" IsVisible="{Binding HasAverage}" Text="{Binding AverageText}" FontWeight="SemiBold" Foreground="#F2B94C" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </ToggleButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </DockPanel>
+                    <lvc:CartesianChart x:Name="Chart" Grid.Row="1"
                                         Series="{Binding Series}"
+                                        Sections="{Binding Sections}"
                                         XAxes="{Binding XAxes}"
                                         YAxes="{Binding YAxes}"
-                                        LegendPosition="Top"
+                                        LegendPosition="Hidden"
                                         TooltipPosition="Top"
                                         ZoomMode="None"
                                         AnimationsSpeed="0:0:0"
                                         EasingFunction="{x:Null}"
                                         Cursor="Cross"
                                         Background="Transparent" />
-                    <TextBlock IsVisible="{Binding !HasSelection}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    <TextBlock Grid.Row="1" IsVisible="{Binding !HasSelection}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"
                                Text="Waiting for the first disk sample..." />
-                    <Button Classes="icon chartctl" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
-                            Command="{Binding TogglePauseCommand}" ToolTip.Tip="{Binding PauseButtonText}">
-                        <Panel>
-                            <PathIcon Data="{StaticResource IconPause}" IsVisible="{Binding !IsPaused}" />
-                            <PathIcon Data="{StaticResource IconPlay}" IsVisible="{Binding IsPaused}" />
-                        </Panel>
-                    </Button>
-                    <Border IsVisible="{Binding IsPaused}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,4,0,0"
-                            Background="#2A313D" CornerRadius="10" Padding="10,2">
-                        <TextBlock Classes="muted" FontSize="11" Text="Paused — chart and table are frozen, sampling continues" />
-                    </Border>
                 </Grid>
             </Border>
 
@@ -413,7 +497,7 @@
                         <Button Classes="seg" Classes.active="{Binding IsWindow5}" Content="5 s" Command="{Binding SelectWindowCommand}" CommandParameter="5" />
                         <Button Classes="seg" Classes.active="{Binding IsWindow60}" Content="1 min" Command="{Binding SelectWindowCommand}" CommandParameter="60" />
                         <Button Classes="seg" Classes.active="{Binding IsWindow300}" Content="5 min" Command="{Binding SelectWindowCommand}" CommandParameter="300" />
-                        <Button Classes="seg" Classes.active="{Binding IsCumulative}" Content="&#x3A3; since start" Command="{Binding SelectWindowCommand}" CommandParameter="all" />
+                        <Button Classes="seg" Classes.active="{Binding IsCumulativeActive}" Content="&#x3A3; since start" Command="{Binding SelectWindowCommand}" CommandParameter="all" />
                     </StackPanel>
                 </Border>
                 <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">

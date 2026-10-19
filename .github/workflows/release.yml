@@ -70,6 +70,9 @@ jobs:
           name: dist-${{ matrix.rid }}
           path: dist/*
           if-no-files-found: error
+          # Only a hand-off to the release job, which attaches the files to the
+          # GitHub Release — keeping them 90 days burns the storage quota.
+          retention-days: 1
 
   release:
     needs: build
